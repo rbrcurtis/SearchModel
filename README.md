@@ -17,10 +17,10 @@ TypeScript Active Record pattern implementation for Elasticsearch with decorator
 
 ```bash
 # Install from GitHub
-npm install github:accordyx/search-model
+npm install github:rbrcurtis/SearchModel
 
 # Or with Yarn
-yarn add github:accordyx/search-model
+yarn add github:rbrcurtis/SearchModel
 ```
 
 ## Quick Start
@@ -404,4 +404,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Support
 
-For issues and feature requests, please use the [GitHub issue tracker](https://github.com/accordyx/search-model/issues).
+For issues and feature requests, please use the [GitHub issue tracker](https://github.com/rbrcurtis/SearchModel/issues).
