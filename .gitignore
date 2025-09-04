@@ -2,9 +2,6 @@
 node_modules/
 
 # Build outputs
-lib/
-esm/
-types/
 dist/
 
 # Environment files

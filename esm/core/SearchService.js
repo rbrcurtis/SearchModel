@@ -1,0 +1,235 @@
+import 'dotenv/config';
+import { debug, logError, logWarn, log } from '../utils/logging';
+export class SearchError extends Error {
+    constructor(message, statusCode, response) {
+        super(message);
+        this.statusCode = statusCode;
+        this.response = response;
+        this.name = 'SearchError';
+    }
+}
+export class VersionConflictError extends SearchError {
+    constructor(message, currentVersion, attemptedVersion) {
+        super(message, 409);
+        this.currentVersion = currentVersion;
+        this.attemptedVersion = attemptedVersion;
+        this.name = 'VersionConflictError';
+    }
+}
+export class SearchService {
+    constructor(config = {}) {
+        this.config = {
+            baseUrl: config.baseUrl ||
+                process.env.ELASTICSEARCH_URL ||
+                'http://localhost:9201',
+            maxRetries: config.maxRetries || 3,
+            baseDelayMs: config.baseDelayMs || 1000,
+            maxDelayMs: config.maxDelayMs || 30000,
+        };
+    }
+    async delay(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+    calculateDelay({ attempt, baseDelayMs, maxDelayMs, }) {
+        const exponentialDelay = baseDelayMs * Math.pow(2, attempt - 1);
+        const jitter = Math.random() * 0.1 * exponentialDelay;
+        return Math.min(exponentialDelay + jitter, maxDelayMs);
+    }
+    async executeRequest(method, path, data, attempt = 1) {
+        const url = `${this.config.baseUrl}${path.startsWith('/') ? '' : '/'}${path}`;
+        const options = {
+            method: method.toUpperCase(),
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        };
+        if (data && !['GET', 'HEAD'].includes(method.toUpperCase())) {
+            options.body = JSON.stringify(data);
+        }
+        debug('elasticsearch', `[search.executeRequest] Making HTTP request`, {
+            url,
+            method,
+            hasBody: !!options.body,
+            headers: options.headers,
+        });
+        try {
+            const response = await fetch(url, options);
+            debug('elasticsearch', `[search.executeRequest] Got HTTP response`, {
+                status: response.status,
+                statusText: response.statusText,
+                ok: response.ok,
+            });
+            if (response.status === 429 && attempt <= this.config.maxRetries) {
+                const delayMs = this.calculateDelay({
+                    attempt,
+                    maxRetries: this.config.maxRetries,
+                    baseDelayMs: this.config.baseDelayMs,
+                    maxDelayMs: this.config.maxDelayMs,
+                });
+                logWarn(`Rate limited (429). Retrying in ${delayMs}ms... (attempt ${attempt}/${this.config.maxRetries})`);
+                await this.delay(delayMs);
+                return this.executeRequest(method, path, data, attempt + 1);
+            }
+            if (!response.ok) {
+                const errorBody = await response.text();
+                if (response.status === 409 &&
+                    errorBody.includes('version_conflict_engine_exception')) {
+                    let currentVersion;
+                    let attemptedVersion;
+                    try {
+                        const errorData = JSON.parse(errorBody);
+                        const error = errorData.error;
+                        if (error && error.reason) {
+                            const versionMatch = error.reason.match(/current version \[(\d+)\].*version \[(\d+)\]/);
+                            if (versionMatch) {
+                                currentVersion = parseInt(versionMatch[1], 10);
+                                attemptedVersion = parseInt(versionMatch[2], 10);
+                            }
+                        }
+                    }
+                    catch (e) {
+                    }
+                    throw new VersionConflictError('Document version conflict: another process has modified this document', currentVersion, attemptedVersion);
+                }
+                const shouldLogError = response.status !== 404 &&
+                    !(response.status === 400 &&
+                        errorBody.includes('resource_already_exists_exception'));
+                if (shouldLogError) {
+                    logError('Elasticsearch Error Details:', {
+                        status: `${response.status} ${response.statusText}`,
+                        url,
+                        method,
+                        response: errorBody,
+                        requestBody: data && !['GET', 'HEAD'].includes(method.toUpperCase())
+                            ? JSON.stringify(data, null, 2)
+                            : undefined,
+                    });
+                }
+                else {
+                    log('Elasticsearch non-error response:', {
+                        status: `${response.status} ${response.statusText}`,
+                        url,
+                        method,
+                        responsePreview: errorBody.substring(0, 200),
+                    });
+                }
+                throw new SearchError(`Search request failed: ${response.status} ${response.statusText}`, response.status, errorBody);
+            }
+            return await response.json();
+        }
+        catch (error) {
+            if (error instanceof SearchError) {
+                throw error;
+            }
+            if (attempt <= this.config.maxRetries) {
+                const delayMs = this.calculateDelay({
+                    attempt,
+                    maxRetries: this.config.maxRetries,
+                    baseDelayMs: this.config.baseDelayMs,
+                    maxDelayMs: this.config.maxDelayMs,
+                });
+                logWarn(`Request failed: ${error}. Retrying in ${delayMs}ms... (attempt ${attempt}/${this.config.maxRetries})`);
+                await this.delay(delayMs);
+                return this.executeRequest(method, path, data, attempt + 1);
+            }
+            throw new SearchError(`Search request failed after ${this.config.maxRetries} retries: ${error}`, undefined, error);
+        }
+    }
+    async searchRequest(method, path, data, options) {
+        let fullPath = path;
+        if (options?.version) {
+            const separator = path.includes('?') ? '&' : '?';
+            fullPath = `${path}${separator}version=${options.version}&version_type=external`;
+        }
+        return this.executeRequest(method, fullPath, data);
+    }
+    async query(ModelClass, terms, options = {}) {
+        let indexName;
+        let isModelClass = false;
+        if (typeof ModelClass === 'string') {
+            indexName = ModelClass;
+        }
+        else {
+            indexName = ModelClass.indexName;
+            isModelClass = true;
+            if (!indexName) {
+                throw new SearchError(`IndexName not defined for ${ModelClass.name}`);
+            }
+        }
+        const { limit = 1000, sort, page } = options;
+        const searchBody = {
+            query: {
+                bool: {
+                    must: terms.map((term) => ({
+                        query_string: {
+                            query: term,
+                        },
+                    })),
+                },
+            },
+            size: limit,
+        };
+        if (sort) {
+            let fieldName = sort;
+            let sortOrder = 'asc';
+            if (sort.includes(':')) {
+                const [field, order] = sort.split(':');
+                fieldName = field;
+                sortOrder = order === 'desc' ? 'desc' : 'asc';
+            }
+            searchBody.sort = [{ [fieldName]: { order: sortOrder } }];
+        }
+        if (page && page > 1) {
+            searchBody.from = (page - 1) * limit;
+        }
+        try {
+            const response = await this.searchRequest('POST', `/${indexName}/_search`, searchBody);
+            debug('elasticsearch', 'query response', response);
+            const total = response.hits?.total?.value ?? response.hits?.total ?? 0;
+            debug('elasticsearch', 'total', total);
+            if (isModelClass) {
+                const hits = response.hits?.hits?.map((hit) => ModelClass.fromJSON({
+                    id: hit._id,
+                    ...hit._source,
+                })) || [];
+                return { hits, total };
+            }
+            else {
+                const hits = response.hits?.hits?.map((hit) => hit._source) || [];
+                return { hits, total };
+            }
+        }
+        catch (error) {
+            if (error instanceof SearchError && error.statusCode === 404) {
+                debug('search', `Index ${indexName} not found (404), returning empty results`);
+                return { hits: [], total: 0 };
+            }
+            throw error;
+        }
+    }
+    async getById(ModelClass, id) {
+        const indexName = ModelClass.indexName;
+        if (!indexName) {
+            throw new SearchError(`IndexName not defined for ${ModelClass.name}`);
+        }
+        try {
+            const response = await this.searchRequest('GET', `/${indexName}/_doc/${id}`);
+            if (response.found) {
+                return ModelClass.fromJSON({
+                    id: response._id,
+                    ...response._source,
+                });
+            }
+            return null;
+        }
+        catch (error) {
+            if (error instanceof SearchError && error.statusCode === 404) {
+                debug('search', `Document ${id} not found in index ${indexName} (404), returning null`);
+                return null;
+            }
+            throw error;
+        }
+    }
+}
+export const search = new SearchService();
+//# sourceMappingURL=SearchService.js.map
