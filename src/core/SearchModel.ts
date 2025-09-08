@@ -277,7 +277,7 @@ export abstract class SearchModel {
           (error.response &&
             error.response.includes('resource_already_exists_exception')))
       ) {
-        log(`Index '${indexName}' already exists, skipping creation`, {
+        debug('search', `Index '${indexName}' already exists, skipping creation`, {
           indexName,
         })
       } else {
@@ -386,7 +386,7 @@ export abstract class SearchModel {
     // Store the current version for optimistic locking before modifying it
     const currentVersion = this.version
 
-    log(
+    debug('search',
       `[SearchModel.save] Starting save for ${this.constructor.name} (ID: ${this.id})`,
       {
         isNewDocument: this._isNewDocument,
@@ -398,11 +398,11 @@ export abstract class SearchModel {
     if (this._isNewDocument) {
       this.createdAt = now
       this.version = 1
-      log(`[SearchModel.save] New document - setting version to 1`)
+      debug('search', `[SearchModel.save] New document - setting version to 1`)
     } else {
       // Increment version for existing documents
       this.version += 1
-      log(
+      debug('search',
         `[SearchModel.save] Existing document - incrementing version from ${currentVersion} to ${this.version}`
       )
     }
@@ -410,7 +410,7 @@ export abstract class SearchModel {
 
     const document = this.toDocument()
 
-    log(`[SearchModel.save] About to send request to Elasticsearch`, {
+    debug('search', `[SearchModel.save] About to send request to Elasticsearch`, {
       indexName,
       documentId: this.id,
       versionInDocument: this.version,
@@ -431,7 +431,7 @@ export abstract class SearchModel {
       // If ES returned a version, update our version to match
       if (result && result._version) {
         this.version = result._version
-        log(
+        debug('search',
           `[SearchModel.save] Updated version from ES response: ${result._version}`
         )
       }
@@ -445,7 +445,7 @@ export abstract class SearchModel {
       // Call afterSave lifecycle hook
       await this.afterSave(saveEvent)
 
-      log(
+      debug('search',
         `[SearchModel.save] Save successful for ${this.constructor.name} (ID: ${this.id})`
       )
       return this
