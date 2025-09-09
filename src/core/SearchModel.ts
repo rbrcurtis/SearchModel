@@ -457,7 +457,7 @@ export abstract class SearchModel {
     }
     this.updatedAt = now
 
-    const document = this.toDocument()
+    const document = this.toJSON()
 
     debug('search', `[SearchModel.save] About to send request to Elasticsearch`, {
       indexName,
@@ -549,8 +549,8 @@ export abstract class SearchModel {
     }
   }
 
-  // Convert model instance to document for storage using field decorators
-  protected toDocument(): Record<string, any> {
+  // Convert model instance to JSON for storage using field decorators
+  public toJSON(): Record<string, any> {
     return this.toSearch()
   }
 
