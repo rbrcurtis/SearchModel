@@ -1,4 +1,5 @@
 const FIELD_METADATA_KEY = Symbol('fieldMetadata');
+export const PRIVATE_STORAGE = Symbol('__privateStorage__');
 export function getFieldMetadata(target) {
     return Reflect.getMetadata(FIELD_METADATA_KEY, target) || [];
 }
@@ -94,26 +95,33 @@ export function validateFieldType(value, type, propertyKey, options) {
             break;
     }
 }
+function getPrivateStorage(instance) {
+    if (!instance[PRIVATE_STORAGE]) {
+        Object.defineProperty(instance, PRIVATE_STORAGE, {
+            value: {},
+            writable: false,
+            enumerable: false,
+            configurable: false
+        });
+    }
+    return instance[PRIVATE_STORAGE];
+}
 function createValidatedProperty(target, propertyKey, type, options) {
-    const privateKey = `_${propertyKey}`;
     Object.defineProperty(target, propertyKey, {
         get: function () {
-            let value = this[privateKey];
-            if (value === undefined && options.default) {
-                value = options.default();
-                this[privateKey] = value;
-            }
-            return value;
+            const storage = getPrivateStorage(this);
+            return storage[propertyKey];
         },
         set: function (value) {
-            const oldValue = this[privateKey];
+            const storage = getPrivateStorage(this);
+            const oldValue = storage[propertyKey];
             if (value !== undefined && value !== null) {
                 validateFieldType(value, type, propertyKey, options);
                 if (options.validate && !options.validate(value)) {
                     throw new Error(`Field '${propertyKey}' failed custom validation`);
                 }
             }
-            this[privateKey] = value;
+            storage[propertyKey] = value;
             if (this.markFieldChanged && oldValue !== value) {
                 this.markFieldChanged(propertyKey);
             }

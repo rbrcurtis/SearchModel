@@ -1,3 +1,4 @@
+export declare const PRIVATE_STORAGE: unique symbol;
 interface BaseFieldOptions {
     required?: boolean;
     transform?: (value: any) => any;

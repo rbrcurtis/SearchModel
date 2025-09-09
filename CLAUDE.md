@@ -13,7 +13,7 @@ This project uses **Yarn** as the package manager. Do not use npm.
 - `yarn format` - Format code with Prettier
 
 ## Pre-commit Hook
-The project has a Husky pre-commit hook that runs `yarn build` before each commit to ensure the code compiles successfully.
+The project has a Husky pre-commit hook that runs `yarn build && yarn test` before each commit to ensure the code compiles successfully and all tests pass.
 
 ## Testing
 - Jest is configured for TypeScript testing

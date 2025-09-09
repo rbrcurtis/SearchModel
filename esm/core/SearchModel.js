@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 import 'reflect-metadata';
 import { search, SearchError, VersionConflictError } from './SearchService';
-import { getFieldMetadata, StringType, DateType, NumberType, } from '../decorators';
+import { getFieldMetadata, StringType, DateType, NumberType, PRIVATE_STORAGE, } from '../decorators';
 import { id } from '../utils/id';
 import { logError, debug } from '../utils/logging';
 export class SearchModel {
@@ -47,21 +47,25 @@ export class SearchModel {
                 }
             }
         }
-        Object.assign(this, processedData);
-        if (data.createdAt && typeof data.createdAt === 'string') {
-            this.createdAt = new Date(data.createdAt);
-        }
-        if (data.updatedAt && typeof data.updatedAt === 'string') {
-            this.updatedAt = new Date(data.updatedAt);
-        }
-        if (!this.version) {
-            this.version = 1;
+        for (const [key, value] of Object.entries(processedData)) {
+            if (key === 'createdAt' && typeof value === 'string') {
+                this.createdAt = new Date(value);
+            }
+            else if (key === 'updatedAt' && typeof value === 'string') {
+                this.updatedAt = new Date(value);
+            }
+            else {
+                this[key] = value;
+            }
         }
         if (data.id && data.version) {
             this._isNewDocument = false;
         }
     }
     static fromJSON(properties) {
+        if (properties instanceof this) {
+            return properties;
+        }
         return new this(properties);
     }
     static generateMapping() {
@@ -236,10 +240,40 @@ export class SearchModel {
     }
     static async findOne(terms) {
         const results = await this.find(terms, { limit: 1 });
-        return results.length > 0 ? this.fromJSON(results[0]) : null;
+        return results.length > 0 ? results[0] : null;
     }
     static async getById(id) {
         return await search.getById(this, id);
+    }
+    applyDefaults() {
+        const fieldMetadata = getFieldMetadata(this.constructor.prototype);
+        const storage = this[PRIVATE_STORAGE] || {};
+        for (const field of fieldMetadata) {
+            const value = storage[field.propertyKey] ?? this[field.propertyKey];
+            if (value === undefined && field.options?.default) {
+                const defaultValue = field.options.default();
+                if (!this[PRIVATE_STORAGE]) {
+                    Object.defineProperty(this, PRIVATE_STORAGE, {
+                        value: {},
+                        writable: false,
+                        enumerable: false,
+                        configurable: false
+                    });
+                }
+                ;
+                this[PRIVATE_STORAGE][field.propertyKey] = defaultValue;
+            }
+        }
+    }
+    validateRequiredFields() {
+        const fieldMetadata = getFieldMetadata(this.constructor.prototype);
+        const storage = this[PRIVATE_STORAGE] || {};
+        for (const field of fieldMetadata) {
+            const value = storage[field.propertyKey] ?? this[field.propertyKey];
+            if (field.options?.required && (value === undefined || value === null)) {
+                throw new Error(`Required field '${field.propertyKey}' is missing`);
+            }
+        }
     }
     async save() {
         const indexName = this.constructor.indexName;
@@ -249,6 +283,8 @@ export class SearchModel {
         const changedFields = this.getChangedFields();
         const saveEvent = { updated: changedFields };
         await this.beforeSave(saveEvent);
+        this.applyDefaults();
+        this.validateRequiredFields();
         const now = new Date();
         const currentVersion = this.version;
         debug('search', `[SearchModel.save] Starting save for ${this.constructor.name} (ID: ${this.id})`, {
@@ -379,14 +415,11 @@ export class SearchModel {
     }
     toSearch() {
         const fieldMetadata = getFieldMetadata(this.constructor.prototype);
+        const storage = this[PRIVATE_STORAGE] || {};
         const doc = {};
         for (const field of fieldMetadata) {
-            let value = this[`_${field.propertyKey}`] ||
-                this[field.propertyKey];
+            let value = storage[field.propertyKey] ?? this[field.propertyKey];
             const options = field.options || {};
-            if (options.required && (value === undefined || value === null)) {
-                throw new Error(`Required field '${field.propertyKey}' is missing`);
-            }
             if (value !== undefined) {
                 value = this.transformFieldValue(value, field.type, options);
                 if (options.transform) {

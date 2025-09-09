@@ -43,6 +43,8 @@ export declare abstract class SearchModel {
     }>;
     static findOne<T extends SearchModel>(this: new (data?: any) => T, terms: string[]): Promise<T | null>;
     static getById<T extends SearchModel>(this: new (data?: any) => T, id: string): Promise<T | null>;
+    private applyDefaults;
+    private validateRequiredFields;
     save(): Promise<this>;
     delete(): Promise<void>;
     protected toDocument(): Record<string, any>;
