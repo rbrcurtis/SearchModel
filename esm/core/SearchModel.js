@@ -302,7 +302,7 @@ export class SearchModel {
             debug('search', `[SearchModel.save] Existing document - incrementing version from ${currentVersion} to ${this.version}`);
         }
         this.updatedAt = now;
-        const document = this.toDocument();
+        const document = this.toJSON();
         debug('search', `[SearchModel.save] About to send request to Elasticsearch`, {
             indexName,
             documentId: this.id,
@@ -357,7 +357,7 @@ export class SearchModel {
             throw error;
         }
     }
-    toDocument() {
+    toJSON() {
         return this.toSearch();
     }
     transformObjectValue(value, properties) {

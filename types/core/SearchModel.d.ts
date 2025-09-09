@@ -47,7 +47,7 @@ export declare abstract class SearchModel {
     private validateRequiredFields;
     save(): Promise<this>;
     delete(): Promise<void>;
-    protected toDocument(): Record<string, any>;
+    toJSON(): Record<string, any>;
     private transformObjectValue;
     private transformFieldValue;
     toString(): string;
