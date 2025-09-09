@@ -6,6 +6,7 @@ import {
   StringType,
   DateType,
   NumberType,
+  PRIVATE_STORAGE,
 } from '../decorators'
 import { id } from '../utils/id'
 import { log, logError, logWarn, debug } from '../utils/logging'
@@ -98,17 +99,15 @@ export abstract class SearchModel {
       }
     }
 
-    Object.assign(this, processedData)
-
-    if (data.createdAt && typeof data.createdAt === 'string') {
-      this.createdAt = new Date(data.createdAt)
-    }
-    if (data.updatedAt && typeof data.updatedAt === 'string') {
-      this.updatedAt = new Date(data.updatedAt)
-    }
-    // Ensure version defaults to 1 for new documents
-    if (!this.version) {
-      this.version = 1
+    // Set each property individually to trigger setters and store in private storage
+    for (const [key, value] of Object.entries(processedData)) {
+      if (key === 'createdAt' && typeof value === 'string') {
+        this.createdAt = new Date(value)
+      } else if (key === 'updatedAt' && typeof value === 'string') {
+        this.updatedAt = new Date(value)
+      } else {
+        (this as any)[key] = value
+      }
     }
 
     // If we have data with an id and version, this is an existing document
@@ -122,6 +121,10 @@ export abstract class SearchModel {
     this: new (data?: any) => T,
     properties: any
   ): T {
+    // If properties is already an instance of this class, return it as-is
+    if (properties instanceof this) {
+      return properties
+    }
     return new this(properties)
   }
 
@@ -357,7 +360,7 @@ export abstract class SearchModel {
     terms: string[]
   ): Promise<T | null> {
     const results = await (this as any).find(terms, { limit: 1 })
-    return results.length > 0 ? (this as any).fromJSON(results[0]) : null
+    return results.length > 0 ? results[0] : null
   }
 
   static async getById<T extends SearchModel>(
@@ -365,6 +368,46 @@ export abstract class SearchModel {
     id: string
   ): Promise<T | null> {
     return await search.getById(this as any, id)
+  }
+
+  // Apply default values to fields that are undefined
+  private applyDefaults(): void {
+    const fieldMetadata = getFieldMetadata(this.constructor.prototype)
+    const storage = (this as any)[PRIVATE_STORAGE] || {}
+    
+    for (const field of fieldMetadata) {
+      const value = storage[field.propertyKey] ?? (this as any)[field.propertyKey]
+      
+      // Apply default value if field is undefined and default is provided
+      if (value === undefined && field.options?.default) {
+        const defaultValue = field.options.default()
+        // Set directly in storage to avoid triggering the setter
+        if (!(this as any)[PRIVATE_STORAGE]) {
+          Object.defineProperty(this, PRIVATE_STORAGE, {
+            value: {},
+            writable: false,
+            enumerable: false,
+            configurable: false
+          })
+        }
+        ;(this as any)[PRIVATE_STORAGE][field.propertyKey] = defaultValue
+      }
+    }
+  }
+
+  // Validate required fields
+  private validateRequiredFields(): void {
+    const fieldMetadata = getFieldMetadata(this.constructor.prototype)
+    const storage = (this as any)[PRIVATE_STORAGE] || {}
+    
+    for (const field of fieldMetadata) {
+      const value = storage[field.propertyKey] ?? (this as any)[field.propertyKey]
+      
+      // Check required fields
+      if (field.options?.required && (value === undefined || value === null)) {
+        throw new Error(`Required field '${field.propertyKey}' is missing`)
+      }
+    }
   }
 
   // Instance methods
@@ -380,6 +423,12 @@ export abstract class SearchModel {
 
     // Call beforeSave lifecycle hook
     await this.beforeSave(saveEvent)
+    
+    // Apply defaults after beforeSave but before validation
+    this.applyDefaults()
+    
+    // Validate required fields after defaults are applied
+    this.validateRequiredFields()
 
     const now = new Date()
 
@@ -580,19 +629,13 @@ export abstract class SearchModel {
   // Generate Elasticsearch document body based on field decorators
   public toSearch(): Record<string, any> {
     const fieldMetadata = getFieldMetadata(this.constructor.prototype)
+    const storage = (this as any)[PRIVATE_STORAGE] || {}
     const doc: Record<string, any> = {}
 
     for (const field of fieldMetadata) {
-      // Access the private property since we're using getters/setters
-      let value =
-        (this as any)[`_${field.propertyKey}`] ||
-        (this as any)[field.propertyKey]
+      // Access value from private storage or fallback to property
+      let value = storage[field.propertyKey] ?? (this as any)[field.propertyKey]
       const options = field.options || {}
-
-      // Check required fields
-      if (options.required && (value === undefined || value === null)) {
-        throw new Error(`Required field '${field.propertyKey}' is missing`)
-      }
 
       if (value !== undefined) {
         // Transform value based on field type

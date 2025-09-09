@@ -1,6 +1,9 @@
 // Metadata key for storing field type information
 const FIELD_METADATA_KEY = Symbol('fieldMetadata')
 
+// Symbol key for private storage - completely hidden from users
+export const PRIVATE_STORAGE = Symbol('__privateStorage__')
+
 // Base options for all field types
 interface BaseFieldOptions {
   required?: boolean
@@ -194,6 +197,20 @@ export function validateFieldType(
   }
 }
 
+// Helper to get private storage for an instance
+function getPrivateStorage(instance: any): Record<string, any> {
+  if (!instance[PRIVATE_STORAGE]) {
+    // Use Object.defineProperty to make it non-enumerable
+    Object.defineProperty(instance, PRIVATE_STORAGE, {
+      value: {},
+      writable: false,
+      enumerable: false,
+      configurable: false
+    })
+  }
+  return instance[PRIVATE_STORAGE]
+}
+
 // Create property setter with validation and change tracking
 function createValidatedProperty(
   target: any,
@@ -201,22 +218,14 @@ function createValidatedProperty(
   type: string,
   options: BaseFieldOptions | StringFieldOptions | ObjectFieldOptions
 ) {
-  const privateKey = `_${propertyKey}`
-
   Object.defineProperty(target, propertyKey, {
     get: function () {
-      let value = this[privateKey]
-
-      // Apply default value if field is undefined and default is provided
-      if (value === undefined && options.default) {
-        value = options.default()
-        this[privateKey] = value
-      }
-
-      return value
+      const storage = getPrivateStorage(this)
+      return storage[propertyKey]
     },
     set: function (value: any) {
-      const oldValue = this[privateKey]
+      const storage = getPrivateStorage(this)
+      const oldValue = storage[propertyKey]
 
       if (value !== undefined && value !== null) {
         // Type validation
@@ -229,7 +238,7 @@ function createValidatedProperty(
       }
 
       // Set the new value
-      this[privateKey] = value
+      storage[propertyKey] = value
 
       // Track field changes (if the value actually changed and this is a SearchModel instance)
       if (this.markFieldChanged && oldValue !== value) {
