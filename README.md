@@ -347,33 +347,88 @@ try {
 
 The library reads configuration from environment variables:
 
-- `ELASTICSEARCH_URL` - Elasticsearch server URL (default: http://localhost:9201)
+- `ELASTICSEARCH_URL` - Elasticsearch server URL (required, no default)
 - `DEBUG_TAGS` - Comma-separated debug tags for logging (e.g., "elasticsearch,search")
 
 ## API Reference
 
 ### SearchModel Static Methods
 
-- `create(properties)` - Create and save a new document
-- `find(terms, options)` - Find documents matching query terms
-- `findWithTotal(terms, options)` - Find with total count
-- `findOne(terms)` - Find first matching document
-- `getById(id)` - Get document by ID
-- `createIndex()` - Create Elasticsearch index with mappings
-- `generateMapping()` - Generate Elasticsearch mapping from decorators
+- `create(properties)` - Create and save a new document with provided properties
+- `find(terms, options)` - Find documents matching query terms, returns array of model instances
+- `findWithTotal(terms, options)` - Find documents with total count, returns `{ hits: T[], total: number }`
+- `findOne(terms)` - Find first matching document or null
+- `getById(id)` - Get document by ID or null if not found
+- `createIndex()` - Create Elasticsearch index with mappings from decorators
+- `generateMapping()` - Generate Elasticsearch mapping from decorator metadata
+- `fromJSON(properties)` - Create model instance from plain object (factory method)
+- `getElasticsearchFieldType(field)` - Convert field metadata to Elasticsearch field type
+- `buildObjectMapping(properties)` - Build mapping for nested object properties
 
 ### SearchModel Instance Methods
 
-- `save()` - Save document to Elasticsearch
+- `save()` - Save document to Elasticsearch (creates new or updates existing)
 - `delete()` - Delete document from Elasticsearch
-- `toDocument()` - Convert to plain object for storage
-- `toSearch()` - Convert to Elasticsearch document format
+- `toJSON()` - Convert to plain object with all field values
+- `toSearch()` - Convert to Elasticsearch document format (same as toJSON)
+- `toString()` - Convert to JSON string representation
+
+### SearchModel Protected Methods (for subclasses)
+
+- `markFieldChanged(fieldName)` - Mark a field as modified
+- `getChangedFields()` - Get array of modified field names
+- `clearChangedFields()` - Clear all change tracking
+- `beforeSave(event)` - Lifecycle hook called before saving
+- `afterSave(event)` - Lifecycle hook called after successful save
+- `beforeDelete(event)` - Lifecycle hook called before deletion
+- `afterDelete(event)` - Lifecycle hook called after successful deletion
+
+#### Important: Using SearchModel in Next.js API Routes
+
+When using SearchModel instances in Next.js API routes, the getter properties don't work properly due to the execution context. Always use `.toJSON()` to get the data:
+
+```typescript
+// ❌ Wrong - getters return undefined in API routes
+export async function GET() {
+  const user = await User.getById(id)
+  return NextResponse.json({ name: user.name }) // name will be undefined
+}
+
+// ✅ Correct - use toJSON() to get the actual data
+export async function GET() {
+  const user = await User.getById(id)
+  const userData = user?.toJSON()
+  return NextResponse.json({ name: userData?.name }) // works correctly
+}
+```
+
+This is necessary because Next.js API routes run in a different JavaScript context where the getter initialization from decorators doesn't work the same way as in Node.js scripts.
 
 ### SearchService Methods
 
-- `searchRequest(method, path, data)` - Raw Elasticsearch HTTP request
-- `query(ModelClass, terms, options)` - Query with model class
-- `getById(ModelClass, id)` - Get document by ID
+- `searchRequest(method, path, data, options?)` - Raw Elasticsearch HTTP request with optional version control
+- `query(ModelClass, terms, options)` - Query with model class or index name, returns `{ hits: T[], total: number }`
+- `getById(ModelClass, id)` - Get document by ID, returns model instance or null
+
+### SearchService Configuration
+
+The SearchService uses the following configuration from environment variables:
+- `ELASTICSEARCH_URL` - Elasticsearch server URL (required, no default)
+
+The service automatically handles:
+- Maximum retry attempts for failed requests: 3
+- Base delay for exponential backoff: 1000ms  
+- Maximum delay between retries: 30000ms
+
+### Error Classes
+
+- `SearchError` - Base error class for all search-related errors
+  - `message` - Error message
+  - `statusCode` - HTTP status code (optional)
+  - `response` - Raw error response (optional)
+- `VersionConflictError` - Thrown when document version conflicts occur
+  - `currentVersion` - Current version in database (optional)
+  - `attemptedVersion` - Version that was attempted (optional)
 
 ## Development
 

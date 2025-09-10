@@ -1,10 +1,4 @@
 import 'dotenv/config';
-interface SearchConfig {
-    baseUrl: string;
-    maxRetries: number;
-    baseDelayMs: number;
-    maxDelayMs: number;
-}
 export declare class SearchError extends Error {
     statusCode?: number | undefined;
     response?: any | undefined;
@@ -15,9 +9,10 @@ export declare class VersionConflictError extends SearchError {
     attemptedVersion?: number | undefined;
     constructor(message: string, currentVersion?: number | undefined, attemptedVersion?: number | undefined);
 }
-export declare class SearchService {
+declare class SearchService {
     private config;
-    constructor(config?: Partial<SearchConfig>);
+    private getConfig;
+    _resetConfig(): void;
     private delay;
     private calculateDelay;
     private executeRequest;

@@ -8,7 +8,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 import 'reflect-metadata';
-import { search, SearchError, VersionConflictError } from './SearchService';
+import { search as searchService, SearchError, VersionConflictError } from './SearchService';
 import { getFieldMetadata, StringType, DateType, NumberType, PRIVATE_STORAGE, } from '../decorators';
 import { id } from '../utils/id';
 import { logError, debug } from '../utils/logging';
@@ -58,6 +58,7 @@ export class SearchModel {
                 this[key] = value;
             }
         }
+        this.applyDefaults();
         if (data.id && data.version) {
             this._isNewDocument = false;
         }
@@ -69,7 +70,6 @@ export class SearchModel {
         return new this(properties);
     }
     static generateMapping() {
-        const instance = new this();
         const fieldMetadata = getFieldMetadata(this.prototype);
         const properties = {};
         for (const field of fieldMetadata) {
@@ -174,7 +174,7 @@ export class SearchModel {
                 },
                 ...mapping,
             };
-            await search.searchRequest('PUT', `/${indexName}`, indexConfig);
+            await searchService.searchRequest('PUT', `/${indexName}`, indexConfig);
             debug('elasticsearch', `✅ Index '${indexName}' created successfully`, {
                 indexName,
             });
@@ -194,7 +194,7 @@ export class SearchModel {
             }
         }
     }
-    static async create(properties) {
+    static async create(properties, options = {}) {
         const now = new Date();
         const instance = new this({
             ...properties,
@@ -202,7 +202,7 @@ export class SearchModel {
             updatedAt: now,
             version: 1,
         });
-        await instance.save();
+        await instance.save(options);
         return instance;
     }
     static async find(terms = [], options = {}) {
@@ -211,7 +211,7 @@ export class SearchModel {
             throw new Error(`IndexName not defined for ${this.name}`);
         }
         try {
-            const response = await search.query(indexName, terms, options);
+            const response = await searchService.query(indexName, terms, options);
             return response.hits.map((hit) => new this({
                 ...hit,
             }));
@@ -229,7 +229,7 @@ export class SearchModel {
             throw new Error(`IndexName not defined for ${this.name}`);
         }
         try {
-            return search.query(this, terms, options);
+            return searchService.query(this, terms, options);
         }
         catch (error) {
             if (error instanceof SearchError) {
@@ -243,7 +243,7 @@ export class SearchModel {
         return results.length > 0 ? results[0] : null;
     }
     static async getById(id) {
-        return await search.getById(this, id);
+        return await searchService.getById(this, id);
     }
     applyDefaults() {
         const fieldMetadata = getFieldMetadata(this.constructor.prototype);
@@ -275,11 +275,12 @@ export class SearchModel {
             }
         }
     }
-    async save() {
+    async save(options = {}) {
         const indexName = this.constructor.indexName;
         if (!indexName) {
             throw new Error(`IndexName not defined for ${this.constructor.name}`);
         }
+        const wait = options.wait ?? true;
         const changedFields = this.getChangedFields();
         const saveEvent = { updated: changedFields };
         await this.beforeSave(saveEvent);
@@ -312,7 +313,9 @@ export class SearchModel {
             versionToSend: this._isNewDocument ? undefined : this.version,
         });
         try {
-            const result = await search.searchRequest('PUT', `/${indexName}/_doc/${this.id}?refresh=wait_for`, document);
+            const refreshParam = wait ? '?refresh=wait_for' : '';
+            const url = `/${indexName}/_doc/${this.id}${refreshParam}`;
+            const result = await searchService.searchRequest('PUT', url, document);
             if (result && result._version) {
                 this.version = result._version;
                 debug('search', `[SearchModel.save] Updated version from ES response: ${result._version}`);
@@ -347,7 +350,7 @@ export class SearchModel {
         const deleteEvent = {};
         await this.beforeDelete(deleteEvent);
         try {
-            await search.searchRequest('DELETE', `/${indexName}/_doc/${this.id}`);
+            await searchService.searchRequest('DELETE', `/${indexName}/_doc/${this.id}`);
             await this.afterDelete(deleteEvent);
         }
         catch (error) {

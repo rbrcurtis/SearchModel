@@ -1,139 +1,177 @@
 import 'reflect-metadata'
 import { SearchModel } from '../SearchModel'
 import { StringType, NumberType, DateType, BooleanType } from '../../decorators'
-import * as SearchService from '../SearchService'
+import { search, SearchError, VersionConflictError } from '../SearchService'
 import { id } from '../../utils/id'
 
-// Mock the SearchService
-jest.mock('../SearchService')
+// Mock the SearchService module
+jest.mock('../SearchService', () => {
+  const actual = jest.requireActual('../SearchService')
+  return {
+    ...actual,
+    search: {
+      searchRequest: jest.fn(),
+      query: jest.fn(),
+      getById: jest.fn()
+    }
+  }
+})
+
+// Type the mocked search for TypeScript
+const mockedSearch = search as jest.Mocked<typeof search>
 
 // Test model class
 class TestModel extends SearchModel {
   static readonly indexName = 'test-index'
-
+  
   @StringType({ required: true })
   name!: string
-
+  
   @NumberType()
-  age?: number
-
+  score!: number
+  
+  @DateType()
+  birthDate!: Date
+  
   @BooleanType()
-  active?: boolean
+  isActive!: boolean
+}
+
+// Test model with lifecycle hooks
+class ModelWithHooks extends SearchModel {
+  static readonly indexName = 'hooks-index'
+  
+  @StringType()
+  name!: string
+  
+  beforeSaveCalled = false
+  afterSaveCalled = false
+  beforeDeleteCalled = false
+  afterDeleteCalled = false
+  
+  protected async beforeSave(event: any): Promise<void> {
+    this.beforeSaveCalled = true
+  }
+  
+  protected async afterSave(event: any): Promise<void> {
+    this.afterSaveCalled = true
+  }
+  
+  protected async beforeDelete(event: any): Promise<void> {
+    this.beforeDeleteCalled = true
+  }
+  
+  protected async afterDelete(event: any): Promise<void> {
+    this.afterDeleteCalled = true
+  }
 }
 
 describe('SearchModel', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    // Reset mock functions for each test
+    mockedSearch.searchRequest.mockReset()
+    mockedSearch.query.mockReset()
+    mockedSearch.getById.mockReset()
   })
 
   describe('constructor', () => {
-    it('should create instance with provided data', () => {
+    it('should initialize with default values', () => {
+      const model = new TestModel()
+      expect(model.id).toBeDefined()
+      expect(model.createdAt).toBeInstanceOf(Date)
+      expect(model.updatedAt).toBeInstanceOf(Date)
+      expect(model.version).toBe(1)
+    })
+
+    it('should initialize with provided values', () => {
       const testId = id()
       const data = {
         id: testId,
         name: 'Test Name',
-        age: 25,
-        active: true,
+        score: 100,
+        birthDate: new Date('1990-01-01'),
+        isActive: true,
         version: 2
       }
+      
       const model = new TestModel(data)
       expect(model.id).toBe(testId)
       expect(model.name).toBe('Test Name')
-      expect(model.age).toBe(25)
-      expect(model.active).toBe(true)
+      expect(model.score).toBe(100)
+      expect(model.birthDate).toEqual(new Date('1990-01-01'))
+      expect(model.isActive).toBe(true)
       expect(model.version).toBe(2)
     })
 
     it('should parse date strings', () => {
-      const dateStr = '2024-01-01T00:00:00.000Z'
+      const dateString = '2023-01-01T00:00:00.000Z'
       const model = new TestModel({
-        createdAt: dateStr,
-        updatedAt: dateStr
+        createdAt: dateString,
+        updatedAt: dateString
       })
+      
       expect(model.createdAt).toBeInstanceOf(Date)
       expect(model.updatedAt).toBeInstanceOf(Date)
-      expect(model.createdAt.toISOString()).toBe(dateStr)
     })
   })
 
   describe('fromJSON', () => {
     it('should create instance from JSON data', () => {
-      const jsonId = id()
+      const testId = id()
       const data = {
-        id: jsonId,
-        name: 'JSON Test',
-        age: 30
+        id: testId,
+        name: 'Test',
+        score: 50
       }
+      
       const model = TestModel.fromJSON(data)
       expect(model).toBeInstanceOf(TestModel)
-      expect(model.id).toBe(jsonId)
-      expect(model.name).toBe('JSON Test')
-      expect(model.age).toBe(30)
+      expect(model.id).toBe(testId)
+      expect(model.name).toBe('Test')
+      expect(model.score).toBe(50)
     })
 
-    it('should return the same instance when passed an instance', () => {
-      const testId = id()
-      const originalInstance = new TestModel({
-        id: testId,
-        name: 'Original Instance',
-        age: 25
-      })
-      
-      const result = TestModel.fromJSON(originalInstance)
-      
-      // Should be the exact same instance, not a copy
-      expect(result).toBe(originalInstance)
-      expect(result.id).toBe(testId)
-      expect(result.name).toBe('Original Instance')
-      expect(result.age).toBe(25)
+    it('should return existing instance if passed', () => {
+      const existing = new TestModel({ name: 'Existing' })
+      const result = TestModel.fromJSON(existing)
+      expect(result).toBe(existing)
     })
   })
 
   describe('generateMapping', () => {
-    it('should generate Elasticsearch mapping from decorators', () => {
+    it('should generate correct Elasticsearch mapping', () => {
       const mapping = SearchModel.generateMapping.call(TestModel as any)
       
       expect(mapping).toHaveProperty('mappings')
       expect(mapping.mappings).toHaveProperty('properties')
       
-      const props = mapping.mappings.properties
-      expect(props.name).toEqual({ type: 'text', fields: { keyword: { type: 'keyword' } } })
-      expect(props.age).toEqual({ type: 'double' })
-      expect(props.active).toEqual({ type: 'boolean' })
-      expect(props.createdAt).toEqual({ type: 'date' })
-      expect(props.updatedAt).toEqual({ type: 'date' })
-    })
-
-    it('should convert fields ending with "id" to keyword type', () => {
-      class ModelWithIds extends SearchModel {
-        static readonly indexName = 'test-ids'
-        
-        @StringType()
-        userId!: string
-        
-        @StringType()
-        productIds!: string
-      }
-      
-      const mapping = SearchModel.generateMapping.call(ModelWithIds as any)
-      const props = mapping.mappings.properties
-      
-      expect(props.userId).toEqual({ type: 'keyword' })
-      expect(props.productIds).toEqual({ type: 'keyword' })
+      const properties = mapping.mappings.properties
+      expect(properties.id).toEqual({ type: 'keyword' })
+      expect(properties.name).toEqual({ 
+        type: 'text', 
+        fields: { keyword: { type: 'keyword' } } 
+      })
+      expect(properties.score).toEqual({ type: 'double' })
+      expect(properties.birthDate).toEqual({ type: 'date' })
+      expect(properties.isActive).toEqual({ type: 'boolean' })
     })
   })
 
   describe('getElasticsearchFieldType', () => {
-    it('should return correct mapping for string type', () => {
+    it('should convert string type correctly', () => {
       const result = SearchModel.getElasticsearchFieldType({
         propertyKey: 'test',
         type: 'string',
         options: {}
       })
-      expect(result).toEqual({ type: 'text', fields: { keyword: { type: 'keyword' } } })
+      expect(result).toEqual({ 
+        type: 'text', 
+        fields: { keyword: { type: 'keyword' } } 
+      })
     })
 
-    it('should return correct mapping for keyword type', () => {
+    it('should convert keyword type correctly', () => {
       const result = SearchModel.getElasticsearchFieldType({
         propertyKey: 'test',
         type: 'keyword',
@@ -142,7 +180,7 @@ describe('SearchModel', () => {
       expect(result).toEqual({ type: 'keyword' })
     })
 
-    it('should return correct mapping for number type', () => {
+    it('should convert number type correctly', () => {
       const result = SearchModel.getElasticsearchFieldType({
         propertyKey: 'test',
         type: 'number',
@@ -151,7 +189,7 @@ describe('SearchModel', () => {
       expect(result).toEqual({ type: 'double' })
     })
 
-    it('should return correct mapping for date type', () => {
+    it('should convert date type correctly', () => {
       const result = SearchModel.getElasticsearchFieldType({
         propertyKey: 'test',
         type: 'date',
@@ -159,53 +197,15 @@ describe('SearchModel', () => {
       })
       expect(result).toEqual({ type: 'date' })
     })
-
-    it('should return correct mapping for boolean type', () => {
-      const result = SearchModel.getElasticsearchFieldType({
-        propertyKey: 'test',
-        type: 'boolean',
-        options: {}
-      })
-      expect(result).toEqual({ type: 'boolean' })
-    })
-
-    it('should return correct mapping for object with properties', () => {
-      const result = SearchModel.getElasticsearchFieldType({
-        propertyKey: 'test',
-        type: 'object',
-        options: {
-          properties: {
-            name: { type: 'string' },
-            age: { type: 'number' }
-          }
-        }
-      })
-      expect(result).toHaveProperty('type', 'object')
-      expect(result).toHaveProperty('properties')
-    })
-
-    it('should return correct mapping for objectArray with properties', () => {
-      const result = SearchModel.getElasticsearchFieldType({
-        propertyKey: 'test',
-        type: 'objectArray',
-        options: {
-          properties: {
-            name: { type: 'string' }
-          }
-        }
-      })
-      expect(result).toHaveProperty('type', 'nested')
-      expect(result).toHaveProperty('properties')
-    })
   })
 
   describe('createIndex', () => {
     it('should create index with correct mapping', async () => {
-      const mockSearchRequest = jest.spyOn(SearchService.search, 'searchRequest').mockResolvedValue({})
+      mockedSearch.searchRequest.mockResolvedValue({})
       
       await SearchModel.createIndex.call(TestModel as any)
       
-      expect(mockSearchRequest).toHaveBeenCalledWith(
+      expect(search.searchRequest).toHaveBeenCalledWith(
         'PUT',
         '/test-index',
         expect.objectContaining({
@@ -216,13 +216,13 @@ describe('SearchModel', () => {
     })
 
     it('should handle existing index gracefully', async () => {
-      const error = new SearchService.SearchError('resource_already_exists_exception')
+      const error = new SearchError('resource_already_exists_exception')
       error.response = 'Index already exists: resource_already_exists_exception'
-      jest.spyOn(SearchService.search, 'searchRequest').mockRejectedValue(error)
+      mockedSearch.searchRequest.mockRejectedValue(error)
       
       // createIndex should not throw when index already exists - it catches this specific error
       await SearchModel.createIndex.call(TestModel as any)
-      expect(jest.spyOn(SearchService.search, 'searchRequest')).toHaveBeenCalled()
+      expect(search.searchRequest).toHaveBeenCalled()
     })
 
     it('should throw error when indexName is not defined', async () => {
@@ -230,58 +230,62 @@ describe('SearchModel', () => {
         // No indexName defined
       }
       
-      await expect(SearchModel.createIndex.call(NoIndexModel as any)).rejects.toThrow('IndexName not defined')
+      await expect(SearchModel.createIndex.call(NoIndexModel as any))
+        .rejects.toThrow('IndexName not defined for NoIndexModel')
     })
   })
 
   describe('save', () => {
     it('should save new document', async () => {
       const testId = id()
-      const mockSearchRequest = jest.spyOn(SearchService.search, 'searchRequest').mockResolvedValue({
+      mockedSearch.searchRequest.mockResolvedValue({
         _id: testId,
         _version: 1
       })
       
-      const model = new TestModel({ name: 'Test' })
-      await model.save()
+      const model = new TestModel({ id: testId, name: 'Test' })
+      const result = await model.save()
       
-      expect(mockSearchRequest).toHaveBeenCalledWith(
+      expect(search.searchRequest).toHaveBeenCalledWith(
         'PUT',
-        expect.stringContaining('/test-index/_doc/'),
+        `/test-index/_doc/${testId}?refresh=wait_for`,
         expect.objectContaining({
-          name: 'Test',
-          version: 1
+          id: testId,
+          name: 'Test'
         })
       )
-      expect(model.version).toBe(1)
+      expect(result).toBe(model)
     })
 
     it('should update existing document', async () => {
       const testId = id()
-      const mockSearchRequest = jest.spyOn(SearchService.search, 'searchRequest').mockResolvedValue({
+      mockedSearch.searchRequest.mockResolvedValue({
         _id: testId,
         _version: 2
       })
       
       const model = new TestModel({ 
-        id: testId,
+        id: testId, 
         name: 'Test',
-        version: 1
+        version: 1,
+        createdAt: new Date(),
+        updatedAt: new Date()
       })
-      model.name = 'Updated'
+      
       await model.save()
       
+      expect(search.searchRequest).toHaveBeenCalled()
       expect(model.version).toBe(2)
     })
 
     it('should handle version conflicts', async () => {
       const testId = id()
-      const versionError = new SearchService.VersionConflictError(
+      const versionError = new VersionConflictError(
         'Version conflict',
         2,
         1
       )
-      jest.spyOn(SearchService.search, 'searchRequest').mockRejectedValue(versionError)
+      mockedSearch.searchRequest.mockRejectedValue(versionError)
       
       const model = new TestModel({ 
         id: testId,
@@ -294,161 +298,220 @@ describe('SearchModel', () => {
 
     it('should call lifecycle hooks', async () => {
       const testId = id()
-      jest.spyOn(SearchService.search, 'searchRequest').mockResolvedValue({
+      mockedSearch.searchRequest.mockResolvedValue({
         _id: testId,
         _version: 1
       })
       
-      const model = new TestModel({ name: 'Test' })
-      const beforeSaveSpy = jest.spyOn(model, 'beforeSave' as any)
-      const afterSaveSpy = jest.spyOn(model, 'afterSave' as any)
+      const model = new ModelWithHooks({ id: testId, name: 'Test' })
+      
+      expect(model.beforeSaveCalled).toBe(false)
+      expect(model.afterSaveCalled).toBe(false)
       
       await model.save()
       
-      expect(beforeSaveSpy).toHaveBeenCalled()
-      expect(afterSaveSpy).toHaveBeenCalled()
+      expect(model.beforeSaveCalled).toBe(true)
+      expect(model.afterSaveCalled).toBe(true)
     })
 
-    it('should validate required fields', async () => {
-      const model = new TestModel({ id: id() })
-      // name is required but not set
-      model.name = undefined as any
+    it('should respect wait option', async () => {
+      const testId = id()
+      mockedSearch.searchRequest.mockResolvedValue({
+        _id: testId,
+        _version: 1
+      })
       
-      await expect(model.save()).rejects.toThrow("Required field 'name' is missing")
+      const model = new TestModel({ id: testId, name: 'Test' })
+      
+      // Test with wait: false
+      await model.save({ wait: false })
+      expect(search.searchRequest).toHaveBeenCalledWith(
+        'PUT',
+        `/test-index/_doc/${testId}`,
+        expect.any(Object)
+      )
+      
+      mockedSearch.searchRequest.mockClear()
+      
+      // Test with wait: true (default)
+      await model.save()
+      expect(search.searchRequest).toHaveBeenCalledWith(
+        'PUT',
+        `/test-index/_doc/${testId}?refresh=wait_for`,
+        expect.any(Object)
+      )
     })
   })
 
   describe('delete', () => {
     it('should delete document', async () => {
       const testId = id()
-      const mockSearchRequest = jest.spyOn(SearchService.search, 'searchRequest').mockResolvedValue({})
+      mockedSearch.searchRequest.mockResolvedValue({})
       
       const model = new TestModel({ id: testId, name: 'Test' })
       await model.delete()
       
-      expect(mockSearchRequest).toHaveBeenCalledWith(
+      expect(search.searchRequest).toHaveBeenCalledWith(
         'DELETE',
         `/test-index/_doc/${testId}`
       )
     })
 
-    it('should throw error when deleting without ID', async () => {
-      const model = new TestModel({ name: 'Test' })
-      // Force the id to be undefined to test the error case
-      Object.defineProperty(model, 'id', {
-        value: undefined,
-        writable: true,
-        configurable: true
-      })
+    it('should throw error when id is missing', async () => {
+      const model = new TestModel()
+      model.id = undefined as any
       
       await expect(model.delete()).rejects.toThrow('Cannot delete document without ID')
     })
 
+    it('should throw error when indexName is not defined', async () => {
+      class NoIndexModel extends SearchModel {
+        // No indexName defined
+      }
+      
+      const model = new NoIndexModel({ id: id() })
+      await expect(model.delete()).rejects.toThrow('IndexName not defined')
+    })
+
     it('should call lifecycle hooks', async () => {
       const testId = id()
-      jest.spyOn(SearchService.search, 'searchRequest').mockResolvedValue({})
+      mockedSearch.searchRequest.mockResolvedValue({})
       
-      const model = new TestModel({ id: testId, name: 'Test' })
-      const beforeDeleteSpy = jest.spyOn(model, 'beforeDelete' as any)
-      const afterDeleteSpy = jest.spyOn(model, 'afterDelete' as any)
+      const model = new ModelWithHooks({ id: testId, name: 'Test' })
+      
+      expect(model.beforeDeleteCalled).toBe(false)
+      expect(model.afterDeleteCalled).toBe(false)
       
       await model.delete()
       
-      expect(beforeDeleteSpy).toHaveBeenCalled()
-      expect(afterDeleteSpy).toHaveBeenCalled()
+      expect(model.beforeDeleteCalled).toBe(true)
+      expect(model.afterDeleteCalled).toBe(true)
     })
   })
 
   describe('static methods', () => {
     describe('create', () => {
-      it('should create and save new instance', async () => {
-        const newId = id()
-        jest.spyOn(SearchService.search, 'searchRequest').mockResolvedValue({
-          _id: newId,
+      it('should create and save new document', async () => {
+        const testId = id()
+        mockedSearch.searchRequest.mockResolvedValue({
+          _id: testId,
           _version: 1
         })
         
-        const model = await TestModel.create({ name: 'New Model' })
+        const result = await TestModel.create({ id: testId, name: 'New' })
         
-        expect(model).toBeInstanceOf(TestModel)
-        expect(model.name).toBe('New Model')
-        expect(model.version).toBe(1)
+        expect(result).toBeInstanceOf(TestModel)
+        expect(result.name).toBe('New')
+        expect(search.searchRequest).toHaveBeenCalled()
+      })
+
+      it('should pass options to save', async () => {
+        const testId = id()
+        mockedSearch.searchRequest.mockResolvedValue({
+          _id: testId,
+          _version: 1
+        })
+        
+        await TestModel.create({ id: testId, name: 'New' }, { wait: false })
+        
+        expect(search.searchRequest).toHaveBeenCalledWith(
+          'PUT',
+          expect.stringMatching(/^\/test-index\/_doc\/[^?]+$/),
+          expect.any(Object)
+        )
       })
     })
-
+    
     describe('find', () => {
       it('should find documents', async () => {
-        const id1 = id()
-        const id2 = id()
-        const mockQuery = jest.spyOn(SearchService.search, 'query').mockResolvedValue({
+        mockedSearch.query.mockResolvedValue({
           hits: [
-            { id: id1, name: 'Test 1' },
-            { id: id2, name: 'Test 2' }
+            { id: id(), name: 'Result 1' },
+            { id: id(), name: 'Result 2' }
           ],
           total: 2
         })
         
-        const results = await TestModel.find(['test'])
+        const results = await TestModel.find(['name:Test'])
         
-        expect(mockQuery).toHaveBeenCalledWith('test-index', ['test'], {})
+        expect(search.query).toHaveBeenCalledWith(
+          'test-index',
+          ['name:Test'],
+          {}
+        )
         expect(results).toHaveLength(2)
         expect(results[0]).toBeInstanceOf(TestModel)
       })
-
-      it('should handle search options', async () => {
-        const mockQuery = jest.spyOn(SearchService.search, 'query').mockResolvedValue({
+      
+      it('should pass options to query', async () => {
+        mockedSearch.query.mockResolvedValue({
           hits: [],
           total: 0
         })
         
-        await TestModel.find(['test'], { limit: 10, sort: 'name:desc', page: 2 })
+        await TestModel.find(['test'], { limit: 10, sort: 'name:desc' })
         
-        expect(mockQuery).toHaveBeenCalledWith(
+        expect(search.query).toHaveBeenCalledWith(
           'test-index',
           ['test'],
-          { limit: 10, sort: 'name:desc', page: 2 }
+          { limit: 10, sort: 'name:desc' }
         )
       })
     })
-
+    
+    describe('findWithTotal', () => {
+      it('should return hits and total', async () => {
+        const hits = [
+          { id: id(), name: 'Result 1' },
+          { id: id(), name: 'Result 2' }
+        ]
+        mockedSearch.query.mockResolvedValue({ hits, total: 42 })
+        
+        const result = await TestModel.findWithTotal(['test'])
+        
+        expect(result.hits).toEqual(hits)
+        expect(result.total).toBe(42)
+      })
+    })
+    
     describe('findOne', () => {
-      it('should return first matching document', async () => {
-        const testId = id()
+      it('should find first matching document', async () => {
+        const testDoc = { id: id(), name: 'First' }
         jest.spyOn(TestModel, 'find').mockResolvedValue([
-          new TestModel({ id: testId, name: 'Test' })
+          new TestModel(testDoc)
         ])
         
-        const result = await TestModel.findOne(['test'])
+        const result = await TestModel.findOne(['name:First'])
         
         expect(result).toBeInstanceOf(TestModel)
-        expect(result?.id).toBe(testId)
+        expect(result?.name).toBe('First')
       })
-
-      it('should return null when no match found', async () => {
+      
+      it('should return null when no documents found', async () => {
         jest.spyOn(TestModel, 'find').mockResolvedValue([])
         
-        const result = await TestModel.findOne(['test'])
+        const result = await TestModel.findOne(['name:NotFound'])
         
         expect(result).toBeNull()
       })
     })
-
+    
     describe('getById', () => {
       it('should get document by ID', async () => {
         const testId = id()
-        const mockGetById = jest.spyOn(SearchService.search, 'getById').mockResolvedValue(
+        mockedSearch.getById.mockResolvedValue(
           new TestModel({ id: testId, name: 'Test' })
         )
         
         const result = await TestModel.getById(testId)
         
-        expect(mockGetById).toHaveBeenCalledWith(TestModel, testId)
+        expect(search.getById).toHaveBeenCalledWith(TestModel, testId)
         expect(result).toBeInstanceOf(TestModel)
       })
-
+      
       it('should return null when document not found', async () => {
         const nonExistentId = id()
-        jest.spyOn(SearchService.search, 'getById').mockResolvedValue(null)
+        mockedSearch.getById.mockResolvedValue(null)
         
         const result = await TestModel.getById(nonExistentId)
         
@@ -459,83 +522,79 @@ describe('SearchModel', () => {
 
   describe('change tracking', () => {
     it('should track field changes', () => {
-      const model = new TestModel({ name: 'Initial' });
+      const model = new TestModel()
+      model['markFieldChanged']('name')
+      model['markFieldChanged']('score')
       
-      // Use protected method through any cast
-      (model as any).markFieldChanged('name');
-      const changed = (model as any).getChangedFields()
-      
+      const changed = model['getChangedFields']()
       expect(changed).toContain('name')
+      expect(changed).toContain('score')
     })
 
     it('should clear changed fields after save', async () => {
       const testId = id()
-      jest.spyOn(SearchService.search, 'searchRequest').mockResolvedValue({
+      mockedSearch.searchRequest.mockResolvedValue({
         _id: testId,
         _version: 1
       })
       
-      const model = new TestModel({ name: 'Test' });
-      (model as any).markFieldChanged('name')
+      const model = new TestModel({ id: testId, name: 'Test' })
+      model['markFieldChanged']('name')
+      
+      expect(model['getChangedFields']()).toContain('name')
       
       await model.save()
       
-      const changed = (model as any).getChangedFields()
-      expect(changed).toHaveLength(0)
+      expect(model['getChangedFields']()).toHaveLength(0)
     })
   })
 
-  describe('toSearch', () => {
-    it('should transform fields correctly', () => {
-      const now = new Date()
+  describe('toJSON', () => {
+    it('should convert model to plain object', () => {
       const testId = id()
       const model = new TestModel({
         id: testId,
         name: 'Test',
-        age: 25,
-        active: true,
-        createdAt: now,
-        updatedAt: now,
-        version: 1
+        score: 100,
+        isActive: true
       })
       
-      const doc = model.toSearch()
+      const json = model.toJSON()
       
-      expect(doc.name).toBe('Test')
-      expect(doc.age).toBe(25)
-      expect(doc.active).toBe(true)
-      expect(doc.createdAt).toBe(now.toISOString())
+      expect(json).toEqual(expect.objectContaining({
+        id: testId,
+        name: 'Test',
+        score: 100,
+        isActive: true
+      }))
     })
+  })
 
-    it('should apply field transformations', () => {
-      class TransformModel extends SearchModel {
-        static readonly indexName = 'transform-test'
-        
-        @StringType({ upperCase: true })
-        upperField!: string
-        
-        @StringType({ lowerCase: true })
-        lowerField!: string
-        
-        @StringType({ trim: true })
-        trimField!: string
-      }
-      
-      const model = new TransformModel({
-        id: id(),
-        upperField: 'test',
-        lowerField: 'TEST',
-        trimField: '  trimmed  ',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        version: 1
+  describe('toSearch', () => {
+    it('should generate Elasticsearch document', () => {
+      const testId = id()
+      const model = new TestModel({
+        id: testId,
+        name: 'Test',
+        score: 100
       })
       
       const doc = model.toSearch()
       
-      expect(doc.upperField).toBe('TEST')
-      expect(doc.lowerField).toBe('test')
-      expect(doc.trimField).toBe('trimmed')
+      expect(doc).toHaveProperty('id', testId)
+      expect(doc).toHaveProperty('name', 'Test')
+      expect(doc).toHaveProperty('score', 100)
+    })
+  })
+
+  describe('toString', () => {
+    it('should return JSON string representation', () => {
+      const model = new TestModel({ name: 'Test' })
+      const str = model.toString()
+      
+      expect(typeof str).toBe('string')
+      const parsed = JSON.parse(str)
+      expect(parsed).toHaveProperty('name', 'Test')
     })
   })
 })

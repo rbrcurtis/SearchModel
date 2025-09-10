@@ -1,34 +1,40 @@
-import { SearchService, SearchError, VersionConflictError } from '../SearchService'
+import { search, SearchError, VersionConflictError } from '../SearchService'
 import { id } from '../../utils/id'
 
 // Mock fetch globally
 global.fetch = jest.fn()
 
 describe('SearchService', () => {
-  let searchService: SearchService
+  const originalEnv = process.env
 
   beforeEach(() => {
-    searchService = new SearchService({
-      baseUrl: 'http://localhost:9200',
-      maxRetries: 2,
-      baseDelayMs: 100,
-      maxDelayMs: 1000
-    })
+    jest.resetModules()
+    process.env = { ...originalEnv, ELASTICSEARCH_URL: 'http://localhost:9200' }
     jest.clearAllMocks()
+    // Reset the config for each test
+    ;(search as any)._resetConfig()
   })
 
-  describe('constructor', () => {
-    it('should use default config when not provided', () => {
-      const service = new SearchService()
-      expect(service).toBeDefined()
-    })
+  afterEach(() => {
+    process.env = originalEnv
+    ;(search as any)._resetConfig()
+  })
 
-    it('should use custom config when provided', () => {
-      const service = new SearchService({
-        baseUrl: 'http://custom:9200',
-        maxRetries: 5
+  describe('initialization', () => {
+    it('should use ELASTICSEARCH_URL from environment', async () => {
+      process.env.ELASTICSEARCH_URL = 'http://custom:9200'
+      
+      ;(global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true })
       })
-      expect(service).toBeDefined()
+      
+      await search.searchRequest('GET', '/test')
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://custom:9200/test',
+        expect.any(Object)
+      )
     })
   })
 
@@ -42,7 +48,7 @@ describe('SearchService', () => {
         json: async () => mockResponse
       })
 
-      const result = await searchService.searchRequest('GET', '/test-index/_doc/123')
+      const result = await search.searchRequest('GET', '/test-index/_doc/123')
 
       expect(global.fetch).toHaveBeenCalledWith(
         'http://localhost:9200/test-index/_doc/123',
@@ -62,7 +68,7 @@ describe('SearchService', () => {
         json: async () => ({ hits: [] })
       })
 
-      await searchService.searchRequest('POST', '/test-index/_search', requestBody)
+      await search.searchRequest('POST', '/test-index/_search', requestBody)
 
       expect(global.fetch).toHaveBeenCalledWith(
         'http://localhost:9200/test-index/_search',
@@ -80,7 +86,7 @@ describe('SearchService', () => {
         json: async () => ({})
       })
 
-      await searchService.searchRequest('PUT', '/test-index/_doc/123', {}, { version: 2 })
+      await search.searchRequest('PUT', '/test-index/_doc/123', {}, { version: 2 })
 
       expect(global.fetch).toHaveBeenCalledWith(
         'http://localhost:9200/test-index/_doc/123?version=2&version_type=external',
@@ -97,7 +103,7 @@ describe('SearchService', () => {
       })
 
       await expect(
-        searchService.searchRequest('GET', '/test-index/_doc/123')
+        search.searchRequest('GET', '/test-index/_doc/123')
       ).rejects.toThrow(SearchError)
     })
 
@@ -117,7 +123,7 @@ describe('SearchService', () => {
       })
 
       await expect(
-        searchService.searchRequest('PUT', '/test-index/_doc/123', {})
+        search.searchRequest('PUT', '/test-index/_doc/123', {})
       ).rejects.toThrow(VersionConflictError)
     })
 
@@ -134,7 +140,7 @@ describe('SearchService', () => {
           json: async () => ({ success: true })
         })
 
-      const result = await searchService.searchRequest('GET', '/test-index/_doc/123')
+      const result = await search.searchRequest('GET', '/test-index/_doc/123')
 
       expect(global.fetch).toHaveBeenCalledTimes(2)
       expect(result).toEqual({ success: true })
@@ -149,7 +155,7 @@ describe('SearchService', () => {
           json: async () => ({ success: true })
         })
 
-      const result = await searchService.searchRequest('GET', '/test-index/_doc/123')
+      const result = await search.searchRequest('GET', '/test-index/_doc/123')
 
       expect(global.fetch).toHaveBeenCalledTimes(2)
       expect(result).toEqual({ success: true })
@@ -159,9 +165,9 @@ describe('SearchService', () => {
       ;(global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'))
 
       await expect(
-        searchService.searchRequest('GET', '/test-index/_doc/123')
-      ).rejects.toThrow('Search request failed after 2 retries')
-    })
+        search.searchRequest('GET', '/test-index/_doc/123')
+      ).rejects.toThrow('Search request failed after 3 retries')
+    }, 10000)
   })
 
   describe('query', () => {
@@ -182,7 +188,7 @@ describe('SearchService', () => {
         json: async () => mockResponse
       })
 
-      const result = await searchService.query('test-index', ['search term'])
+      const result = await search.query('test-index', ['search term'])
 
       expect(result.total).toBe(2)
       expect(result.hits).toHaveLength(2)
@@ -213,7 +219,7 @@ describe('SearchService', () => {
         json: async () => mockResponse
       })
 
-      const result = await searchService.query(TestModel as any, ['search'])
+      const result = await search.query(TestModel as any, ['search'])
 
       expect(result.total).toBe(1)
       expect(result.hits).toHaveLength(1)
@@ -227,7 +233,7 @@ describe('SearchService', () => {
         json: async () => ({ hits: { total: 0, hits: [] } })
       })
 
-      await searchService.query('test-index', ['search'], {
+      await search.query('test-index', ['search'], {
         limit: 50,
         sort: 'createdAt:desc',
         page: 2
@@ -254,7 +260,7 @@ describe('SearchService', () => {
         text: async () => 'Index not found'
       })
 
-      const result = await searchService.query('non-existent-index', [])
+      const result = await search.query('non-existent-index', [])
 
       expect(result.total).toBe(0)
       expect(result.hits).toEqual([])
@@ -284,7 +290,7 @@ describe('SearchService', () => {
         })
       })
 
-      const result = await searchService.getById(TestModel as any, testId)
+      const result = await search.getById(TestModel as any, testId)
 
       expect(result).toBeInstanceOf(TestModel)
       expect((result as any).data.id).toBe(testId)
@@ -309,7 +315,7 @@ describe('SearchService', () => {
         json: async () => ({ found: false })
       })
 
-      const result = await searchService.getById(TestModel as any, nonExistentId)
+      const result = await search.getById(TestModel as any, nonExistentId)
 
       expect(result).toBeNull()
     })
@@ -333,7 +339,7 @@ describe('SearchService', () => {
         text: async () => 'Not found'
       })
 
-      const result = await searchService.getById(TestModel as any, testId)
+      const result = await search.getById(TestModel as any, testId)
 
       expect(result).toBeNull()
     })
@@ -346,7 +352,7 @@ describe('SearchService', () => {
       }
 
       await expect(
-        searchService.getById(NoIndexModel as any, id())
+        search.getById(NoIndexModel as any, id())
       ).rejects.toThrow('IndexName not defined')
     })
   })

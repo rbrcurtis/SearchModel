@@ -16,16 +16,23 @@ export class VersionConflictError extends SearchError {
         this.name = 'VersionConflictError';
     }
 }
-export class SearchService {
-    constructor(config = {}) {
-        this.config = {
-            baseUrl: config.baseUrl ||
-                process.env.ELASTICSEARCH_URL ||
-                'http://localhost:9201',
-            maxRetries: config.maxRetries || 3,
-            baseDelayMs: config.baseDelayMs || 1000,
-            maxDelayMs: config.maxDelayMs || 30000,
-        };
+class SearchService {
+    getConfig() {
+        if (!this.config) {
+            if (!process.env.ELASTICSEARCH_URL) {
+                throw new Error('ELASTICSEARCH_URL environment variable is required');
+            }
+            this.config = {
+                baseUrl: process.env.ELASTICSEARCH_URL,
+                maxRetries: 3,
+                baseDelayMs: 1000,
+                maxDelayMs: 30000,
+            };
+        }
+        return this.config;
+    }
+    _resetConfig() {
+        this.config = undefined;
     }
     async delay(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms));
@@ -36,7 +43,8 @@ export class SearchService {
         return Math.min(exponentialDelay + jitter, maxDelayMs);
     }
     async executeRequest(method, path, data, attempt = 1) {
-        const url = `${this.config.baseUrl}${path.startsWith('/') ? '' : '/'}${path}`;
+        const config = this.getConfig();
+        const url = `${config.baseUrl}${path.startsWith('/') ? '' : '/'}${path}`;
         const options = {
             method: method.toUpperCase(),
             headers: {
@@ -59,14 +67,14 @@ export class SearchService {
                 statusText: response.statusText,
                 ok: response.ok,
             });
-            if (response.status === 429 && attempt <= this.config.maxRetries) {
+            if (response.status === 429 && attempt <= config.maxRetries) {
                 const delayMs = this.calculateDelay({
                     attempt,
-                    maxRetries: this.config.maxRetries,
-                    baseDelayMs: this.config.baseDelayMs,
-                    maxDelayMs: this.config.maxDelayMs,
+                    maxRetries: config.maxRetries,
+                    baseDelayMs: config.baseDelayMs,
+                    maxDelayMs: config.maxDelayMs,
                 });
-                logWarn(`Rate limited (429). Retrying in ${delayMs}ms... (attempt ${attempt}/${this.config.maxRetries})`);
+                logWarn(`Rate limited (429). Retrying in ${delayMs}ms... (attempt ${attempt}/${config.maxRetries})`);
                 await this.delay(delayMs);
                 return this.executeRequest(method, path, data, attempt + 1);
             }
@@ -121,18 +129,18 @@ export class SearchService {
             if (error instanceof SearchError) {
                 throw error;
             }
-            if (attempt <= this.config.maxRetries) {
+            if (attempt <= config.maxRetries) {
                 const delayMs = this.calculateDelay({
                     attempt,
-                    maxRetries: this.config.maxRetries,
-                    baseDelayMs: this.config.baseDelayMs,
-                    maxDelayMs: this.config.maxDelayMs,
+                    maxRetries: config.maxRetries,
+                    baseDelayMs: config.baseDelayMs,
+                    maxDelayMs: config.maxDelayMs,
                 });
-                logWarn(`Request failed: ${error}. Retrying in ${delayMs}ms... (attempt ${attempt}/${this.config.maxRetries})`);
+                logWarn(`Request failed: ${error}. Retrying in ${delayMs}ms... (attempt ${attempt}/${config.maxRetries})`);
                 await this.delay(delayMs);
                 return this.executeRequest(method, path, data, attempt + 1);
             }
-            throw new SearchError(`Search request failed after ${this.config.maxRetries} retries: ${error}`, undefined, error);
+            throw new SearchError(`Search request failed after ${config.maxRetries} retries: ${error}`, undefined, error);
         }
     }
     async searchRequest(method, path, data, options) {

@@ -10,6 +10,9 @@ export interface SaveEvent {
 }
 export interface DeleteEvent {
 }
+export interface SaveOptions {
+    wait?: boolean;
+}
 export declare abstract class SearchModel {
     static readonly indexName: string;
     private _changedFields;
@@ -35,7 +38,7 @@ export declare abstract class SearchModel {
     static createIndex<T extends SearchModel>(this: new (data?: any) => T & {
         constructor: typeof SearchModel;
     }): Promise<void>;
-    static create<T extends SearchModel>(this: new (data?: any) => T, properties: Partial<T>): Promise<T>;
+    static create<T extends SearchModel>(this: new (data?: any) => T, properties: Partial<T>, options?: SaveOptions): Promise<T>;
     static find<T extends SearchModel>(this: new (data?: any) => T, terms?: string[], options?: SearchOptions): Promise<T[]>;
     static findWithTotal<T extends SearchModel>(this: new (data?: any) => T, terms?: string[], options?: SearchOptions): Promise<{
         hits: T[];
@@ -45,7 +48,7 @@ export declare abstract class SearchModel {
     static getById<T extends SearchModel>(this: new (data?: any) => T, id: string): Promise<T | null>;
     private applyDefaults;
     private validateRequiredFields;
-    save(): Promise<this>;
+    save(options?: SaveOptions): Promise<this>;
     delete(): Promise<void>;
     toJSON(): Record<string, any>;
     private transformObjectValue;

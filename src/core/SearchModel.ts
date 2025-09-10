@@ -1,5 +1,5 @@
 import 'reflect-metadata'
-import { search, SearchError, VersionConflictError } from './SearchService'
+import { search as searchService, SearchError, VersionConflictError } from './SearchService'
 import {
   getFieldMetadata,
   FieldMetadata,
@@ -23,6 +23,10 @@ export interface SaveEvent {
 
 export interface DeleteEvent {
   // Reserved for future expansion
+}
+
+export interface SaveOptions {
+  wait?: boolean
 }
 
 export abstract class SearchModel {
@@ -110,6 +114,9 @@ export abstract class SearchModel {
       }
     }
 
+    // Apply defaults to any undefined fields
+    this.applyDefaults()
+    
     // If we have data with an id and version, this is an existing document
     if (data.id && data.version) {
       this._isNewDocument = false
@@ -132,7 +139,6 @@ export abstract class SearchModel {
   static generateMapping<T extends SearchModel>(
     this: new (data?: any) => T & { constructor: typeof SearchModel }
   ): Record<string, any> {
-    const instance = new this()
     const fieldMetadata = getFieldMetadata(this.prototype)
 
     const properties: Record<string, any> = {}
@@ -269,7 +275,7 @@ export abstract class SearchModel {
         ...mapping,
       }
 
-      await search.searchRequest('PUT', `/${indexName}`, indexConfig)
+      await searchService.searchRequest('PUT', `/${indexName}`, indexConfig)
       debug('elasticsearch', `✅ Index '${indexName}' created successfully`, {
         indexName,
       })
@@ -293,7 +299,8 @@ export abstract class SearchModel {
   // Static methods for database operations
   static async create<T extends SearchModel>(
     this: new (data?: any) => T,
-    properties: Partial<T>
+    properties: Partial<T>,
+    options: SaveOptions = {}
   ): Promise<T> {
     const now = new Date()
 
@@ -306,7 +313,7 @@ export abstract class SearchModel {
     })
 
     // Use instance save() method to ensure proper validation and field processing
-    await instance.save()
+    await instance.save(options)
     return instance
   }
 
@@ -321,7 +328,7 @@ export abstract class SearchModel {
     }
 
     try {
-      const response = await search.query(indexName, terms, options)
+      const response = await searchService.query(indexName, terms, options)
       return response.hits.map(
         (hit: any) =>
           new this({
@@ -346,7 +353,7 @@ export abstract class SearchModel {
       throw new Error(`IndexName not defined for ${this.name}`)
     }
     try {
-      return search.query(this as any, terms, options)
+      return searchService.query(this as any, terms, options)
     } catch (error) {
       if (error instanceof SearchError) {
         throw new Error(`Failed to find ${this.name}: ${error.message}`)
@@ -367,7 +374,7 @@ export abstract class SearchModel {
     this: new (data?: any) => T,
     id: string
   ): Promise<T | null> {
-    return await search.getById(this as any, id)
+    return await searchService.getById(this as any, id)
   }
 
   // Apply default values to fields that are undefined
@@ -411,11 +418,14 @@ export abstract class SearchModel {
   }
 
   // Instance methods
-  public async save(): Promise<this> {
+  public async save(options: SaveOptions = {}): Promise<this> {
     const indexName = (this.constructor as any).indexName
     if (!indexName) {
       throw new Error(`IndexName not defined for ${this.constructor.name}`)
     }
+
+    // Default wait to true
+    const wait = options.wait ?? true
 
     // Get changed fields before lifecycle hooks
     const changedFields = this.getChangedFields()
@@ -469,9 +479,13 @@ export abstract class SearchModel {
     })
 
     try {
-      const result = await search.searchRequest(
+      // Build the URL with optional refresh parameter
+      const refreshParam = wait ? '?refresh=wait_for' : ''
+      const url = `/${indexName}/_doc/${this.id}${refreshParam}`
+      
+      const result = await searchService.searchRequest(
         'PUT',
-        `/${indexName}/_doc/${this.id}?refresh=wait_for`,
+        url,
         document
         // Temporarily disable version checking to get system working
         // { version: this._isNewDocument ? undefined : this.version }
@@ -535,7 +549,7 @@ export abstract class SearchModel {
     await this.beforeDelete(deleteEvent)
 
     try {
-      await search.searchRequest('DELETE', `/${indexName}/_doc/${this.id}`)
+      await searchService.searchRequest('DELETE', `/${indexName}/_doc/${this.id}`)
 
       // Call afterDelete lifecycle hook
       await this.afterDelete(deleteEvent)

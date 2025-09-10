@@ -37,19 +37,28 @@ export class VersionConflictError extends SearchError {
   }
 }
 
-export class SearchService {
-  private config: SearchConfig
+class SearchService {
+  private config: SearchConfig | undefined
 
-  constructor(config: Partial<SearchConfig> = {}) {
-    this.config = {
-      baseUrl:
-        config.baseUrl ||
-        process.env.ELASTICSEARCH_URL ||
-        'http://localhost:9201',
-      maxRetries: config.maxRetries || 3,
-      baseDelayMs: config.baseDelayMs || 1000,
-      maxDelayMs: config.maxDelayMs || 30000,
+  private getConfig(): SearchConfig {
+    if (!this.config) {
+      if (!process.env.ELASTICSEARCH_URL) {
+        throw new Error('ELASTICSEARCH_URL environment variable is required')
+      }
+      
+      this.config = {
+        baseUrl: process.env.ELASTICSEARCH_URL,
+        maxRetries: 3,
+        baseDelayMs: 1000,
+        maxDelayMs: 30000,
+      }
     }
+    return this.config
+  }
+
+  // Reset config for testing
+  _resetConfig(): void {
+    this.config = undefined
   }
 
   private async delay(ms: number): Promise<void> {
@@ -72,7 +81,8 @@ export class SearchService {
     data?: any,
     attempt = 1
   ): Promise<any> {
-    const url = `${this.config.baseUrl}${path.startsWith('/') ? '' : '/'}${path}`
+    const config = this.getConfig()
+    const url = `${config.baseUrl}${path.startsWith('/') ? '' : '/'}${path}`
 
     const options: RequestInit = {
       method: method.toUpperCase(),
@@ -101,16 +111,16 @@ export class SearchService {
         ok: response.ok,
       })
 
-      if (response.status === 429 && attempt <= this.config.maxRetries) {
+      if (response.status === 429 && attempt <= config.maxRetries) {
         const delayMs = this.calculateDelay({
           attempt,
-          maxRetries: this.config.maxRetries,
-          baseDelayMs: this.config.baseDelayMs,
-          maxDelayMs: this.config.maxDelayMs,
+          maxRetries: config.maxRetries,
+          baseDelayMs: config.baseDelayMs,
+          maxDelayMs: config.maxDelayMs,
         })
 
         logWarn(
-          `Rate limited (429). Retrying in ${delayMs}ms... (attempt ${attempt}/${this.config.maxRetries})`
+          `Rate limited (429). Retrying in ${delayMs}ms... (attempt ${attempt}/${config.maxRetries})`
         )
         await this.delay(delayMs)
         return this.executeRequest(method, path, data, attempt + 1)
@@ -194,23 +204,23 @@ export class SearchService {
         throw error
       }
 
-      if (attempt <= this.config.maxRetries) {
+      if (attempt <= config.maxRetries) {
         const delayMs = this.calculateDelay({
           attempt,
-          maxRetries: this.config.maxRetries,
-          baseDelayMs: this.config.baseDelayMs,
-          maxDelayMs: this.config.maxDelayMs,
+          maxRetries: config.maxRetries,
+          baseDelayMs: config.baseDelayMs,
+          maxDelayMs: config.maxDelayMs,
         })
 
         logWarn(
-          `Request failed: ${error}. Retrying in ${delayMs}ms... (attempt ${attempt}/${this.config.maxRetries})`
+          `Request failed: ${error}. Retrying in ${delayMs}ms... (attempt ${attempt}/${config.maxRetries})`
         )
         await this.delay(delayMs)
         return this.executeRequest(method, path, data, attempt + 1)
       }
 
       throw new SearchError(
-        `Search request failed after ${this.config.maxRetries} retries: ${error}`,
+        `Search request failed after ${config.maxRetries} retries: ${error}`,
         undefined,
         error
       )
@@ -366,4 +376,5 @@ export class SearchService {
   }
 }
 
+// Export a singleton instance
 export const search = new SearchService()
