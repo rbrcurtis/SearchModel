@@ -1,5 +1,9 @@
 import 'reflect-metadata'
-import { search as searchService, SearchError, VersionConflictError } from './SearchService'
+import {
+  search as searchService,
+  SearchError,
+  VersionConflictError,
+} from './SearchService'
 import {
   getFieldMetadata,
   FieldMetadata,
@@ -110,13 +114,13 @@ export abstract class SearchModel {
       } else if (key === 'updatedAt' && typeof value === 'string') {
         this.updatedAt = new Date(value)
       } else {
-        (this as any)[key] = value
+        ;(this as any)[key] = value
       }
     }
 
     // Apply defaults to any undefined fields
     this.applyDefaults()
-    
+
     // If we have data with an id and version, this is an existing document
     if (data.id && data.version) {
       this._isNewDocument = false
@@ -286,9 +290,13 @@ export abstract class SearchModel {
           (error.response &&
             error.response.includes('resource_already_exists_exception')))
       ) {
-        debug('search', `Index '${indexName}' already exists, skipping creation`, {
-          indexName,
-        })
+        debug(
+          'search',
+          `Index '${indexName}' already exists, skipping creation`,
+          {
+            indexName,
+          }
+        )
       } else {
         logError(`Failed to create index '${indexName}'`, error, { indexName })
         throw error
@@ -381,10 +389,11 @@ export abstract class SearchModel {
   private applyDefaults(): void {
     const fieldMetadata = getFieldMetadata(this.constructor.prototype)
     const storage = (this as any)[PRIVATE_STORAGE] || {}
-    
+
     for (const field of fieldMetadata) {
-      const value = storage[field.propertyKey] ?? (this as any)[field.propertyKey]
-      
+      const value =
+        storage[field.propertyKey] ?? (this as any)[field.propertyKey]
+
       // Apply default value if field is undefined and default is provided
       if (value === undefined && field.options?.default) {
         const defaultValue = field.options.default()
@@ -394,7 +403,7 @@ export abstract class SearchModel {
             value: {},
             writable: false,
             enumerable: false,
-            configurable: false
+            configurable: false,
           })
         }
         ;(this as any)[PRIVATE_STORAGE][field.propertyKey] = defaultValue
@@ -406,10 +415,11 @@ export abstract class SearchModel {
   private validateRequiredFields(): void {
     const fieldMetadata = getFieldMetadata(this.constructor.prototype)
     const storage = (this as any)[PRIVATE_STORAGE] || {}
-    
+
     for (const field of fieldMetadata) {
-      const value = storage[field.propertyKey] ?? (this as any)[field.propertyKey]
-      
+      const value =
+        storage[field.propertyKey] ?? (this as any)[field.propertyKey]
+
       // Check required fields
       if (field.options?.required && (value === undefined || value === null)) {
         throw new Error(`Required field '${field.propertyKey}' is missing`)
@@ -433,10 +443,10 @@ export abstract class SearchModel {
 
     // Call beforeSave lifecycle hook
     await this.beforeSave(saveEvent)
-    
+
     // Apply defaults after beforeSave but before validation
     this.applyDefaults()
-    
+
     // Validate required fields after defaults are applied
     this.validateRequiredFields()
 
@@ -445,7 +455,8 @@ export abstract class SearchModel {
     // Store the current version for optimistic locking before modifying it
     const currentVersion = this.version
 
-    debug('search',
+    debug(
+      'search',
       `[SearchModel.save] Starting save for ${this.constructor.name} (ID: ${this.id})`,
       {
         isNewDocument: this._isNewDocument,
@@ -461,7 +472,8 @@ export abstract class SearchModel {
     } else {
       // Increment version for existing documents
       this.version += 1
-      debug('search',
+      debug(
+        'search',
         `[SearchModel.save] Existing document - incrementing version from ${currentVersion} to ${this.version}`
       )
     }
@@ -469,20 +481,24 @@ export abstract class SearchModel {
 
     const document = this.toJSON()
 
-    debug('search', `[SearchModel.save] About to send request to Elasticsearch`, {
-      indexName,
-      documentId: this.id,
-      versionInDocument: this.version,
-      originalVersion: currentVersion,
-      willUseVersionCheck: !this._isNewDocument,
-      versionToSend: this._isNewDocument ? undefined : this.version,
-    })
+    debug(
+      'search',
+      `[SearchModel.save] About to send request to Elasticsearch`,
+      {
+        indexName,
+        documentId: this.id,
+        versionInDocument: this.version,
+        originalVersion: currentVersion,
+        willUseVersionCheck: !this._isNewDocument,
+        versionToSend: this._isNewDocument ? undefined : this.version,
+      }
+    )
 
     try {
       // Build the URL with optional refresh parameter
       const refreshParam = wait ? '?refresh=wait_for' : ''
       const url = `/${indexName}/_doc/${this.id}${refreshParam}`
-      
+
       const result = await searchService.searchRequest(
         'PUT',
         url,
@@ -494,7 +510,8 @@ export abstract class SearchModel {
       // If ES returned a version, update our version to match
       if (result && result._version) {
         this.version = result._version
-        debug('search',
+        debug(
+          'search',
           `[SearchModel.save] Updated version from ES response: ${result._version}`
         )
       }
@@ -508,7 +525,8 @@ export abstract class SearchModel {
       // Call afterSave lifecycle hook
       await this.afterSave(saveEvent)
 
-      debug('search',
+      debug(
+        'search',
         `[SearchModel.save] Save successful for ${this.constructor.name} (ID: ${this.id})`
       )
       return this
@@ -549,7 +567,10 @@ export abstract class SearchModel {
     await this.beforeDelete(deleteEvent)
 
     try {
-      await searchService.searchRequest('DELETE', `/${indexName}/_doc/${this.id}`)
+      await searchService.searchRequest(
+        'DELETE',
+        `/${indexName}/_doc/${this.id}`
+      )
 
       // Call afterDelete lifecycle hook
       await this.afterDelete(deleteEvent)
@@ -564,7 +585,7 @@ export abstract class SearchModel {
   }
 
   // Convert model instance to JSON for storage using field decorators
-  public toJSON(): Record<string, any> {
+  public toJSON(): any {
     return this.toSearch()
   }
 
