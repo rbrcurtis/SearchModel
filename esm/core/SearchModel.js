@@ -8,7 +8,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 import 'reflect-metadata';
-import { search as searchService, SearchError, VersionConflictError } from './SearchService';
+import { search as searchService, SearchError, VersionConflictError, } from './SearchService';
 import { getFieldMetadata, StringType, DateType, NumberType, PRIVATE_STORAGE, } from '../decorators';
 import { id } from '../utils/id';
 import { logError, debug } from '../utils/logging';
@@ -55,6 +55,7 @@ export class SearchModel {
                 this.updatedAt = new Date(value);
             }
             else {
+                ;
                 this[key] = value;
             }
         }
@@ -257,7 +258,7 @@ export class SearchModel {
                         value: {},
                         writable: false,
                         enumerable: false,
-                        configurable: false
+                        configurable: false,
                     });
                 }
                 ;

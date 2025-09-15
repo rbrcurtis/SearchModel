@@ -50,7 +50,7 @@ export declare abstract class SearchModel {
     private validateRequiredFields;
     save(options?: SaveOptions): Promise<this>;
     delete(): Promise<void>;
-    toJSON(): Record<string, any>;
+    toJSON(): any;
     private transformObjectValue;
     private transformFieldValue;
     toString(): string;
