@@ -276,6 +276,7 @@ class SearchService {
           must: terms.map((term) => ({
             query_string: {
               query: term,
+              default_operator: 'AND',
             },
           })),
         },
