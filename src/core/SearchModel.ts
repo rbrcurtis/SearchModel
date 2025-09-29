@@ -661,6 +661,21 @@ export abstract class SearchModel {
     return JSON.stringify(this.toSearch())
   }
 
+  // Update multiple properties at once without saving
+  public update(data: Record<string, any>): this {
+    const fieldMetadata = getFieldMetadata(this.constructor.prototype)
+    const validFields = new Set(fieldMetadata.map(field => field.propertyKey))
+
+    for (const [key, value] of Object.entries(data)) {
+      // Only update properties that are valid model attributes
+      if (validFields.has(key)) {
+        ;(this as any)[key] = value
+      }
+    }
+
+    return this
+  }
+
   // Generate Elasticsearch document body based on field decorators
   public toSearch(): Record<string, any> {
     const fieldMetadata = getFieldMetadata(this.constructor.prototype)

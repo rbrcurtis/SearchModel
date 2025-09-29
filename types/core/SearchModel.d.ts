@@ -54,5 +54,6 @@ export declare abstract class SearchModel {
     private transformObjectValue;
     private transformFieldValue;
     toString(): string;
+    update(data: Record<string, any>): this;
     toSearch(): Record<string, any>;
 }
