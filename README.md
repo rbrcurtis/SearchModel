@@ -8,6 +8,7 @@ TypeScript Active Record pattern implementation for Elasticsearch with decorator
 - 🎨 **Decorator-based Validation**: Type-safe field validation using TypeScript decorators
 - 🔄 **Automatic Mapping Generation**: Generate Elasticsearch mappings from your models
 - 📝 **Change Tracking**: Track field modifications for optimized updates
+- 🚀 **Batch Updates**: Update multiple properties at once with `.update()` method
 - 🪝 **Lifecycle Hooks**: beforeSave, afterSave, beforeDelete, afterDelete
 - 🔁 **Retry Logic**: Built-in exponential backoff for rate limiting
 - 🔒 **Type Safety**: Full TypeScript support with comprehensive typing
@@ -118,8 +119,16 @@ const user = await User.findOne(['email:john@example.com'])
 // Get by ID
 const user = await User.getById('507f1f77bcf86cd799439011')
 
-// Update
+// Update individual fields
 user.name = 'Jane Doe'
+await user.save()
+
+// Update multiple fields at once
+user.update({
+  name: 'Jane Smith',
+  age: 32,
+  roles: ['user', 'editor']
+})
 await user.save()
 
 // Delete
@@ -298,6 +307,61 @@ const response = await search.searchRequest('POST', '/users/_search', {
 })
 ```
 
+## Batch Updates
+
+The `.update()` method allows you to update multiple properties at once efficiently:
+
+```typescript
+const user = await User.getById('507f1f77bcf86cd799439011')
+
+// Update multiple fields with a single method call
+user.update({
+  name: 'John Smith',
+  age: 31,
+  email: 'john.smith@example.com',
+  roles: ['user', 'admin'],
+  address: {
+    street: '456 Oak Avenue',
+    city: 'Boston',
+    zipCode: '02101'
+  }
+})
+
+// Check which fields were changed
+console.log(user.getChangedFields()) // ['name', 'age', 'email', 'roles', 'address']
+
+// Save all changes at once
+await user.save()
+```
+
+### Key Features of `.update()`:
+
+- **Field Filtering**: Only updates properties that are valid model attributes (have decorators)
+- **Type Safety**: Maintains all validation through existing property setters
+- **Change Tracking**: Automatically tracks which fields were modified
+- **No Auto-Save**: Gives you control over when to persist changes
+- **Method Chaining**: Returns `this` for fluent interfaces
+- **Error Handling**: Invalid property names are silently ignored
+
+```typescript
+// Example with invalid fields - they're safely ignored
+user.update({
+  name: 'Valid Field',        // ✅ Will be updated
+  invalidField: 'ignored',    // ❌ Silently ignored
+  anotherFake: { data: 123 }  // ❌ Silently ignored
+})
+
+// Only 'name' will be tracked as changed
+console.log(user.getChangedFields()) // ['name']
+
+// Method chaining
+user.update({ name: 'First' })
+    .update({ age: 25 })
+    .update({ email: 'new@email.com' })
+
+await user.save() // Saves all changes
+```
+
 ## Change Tracking
 
 Models automatically track which fields have been modified:
@@ -305,13 +369,13 @@ Models automatically track which fields have been modified:
 ```typescript
 class Product extends SearchModel {
   static readonly indexName = 'products'
-  
+
   @StringType({ required: true })
   name!: string
-  
+
   @NumberType({ required: true })
   price!: number
-  
+
   protected async beforeSave(event: SaveEvent): Promise<void> {
     // event.updated contains array of changed field names
     if (event.updated.includes('price')) {
@@ -368,6 +432,7 @@ The library reads configuration from environment variables:
 ### SearchModel Instance Methods
 
 - `save()` - Save document to Elasticsearch (creates new or updates existing)
+- `update(data)` - Update multiple properties at once without saving (returns `this` for chaining)
 - `delete()` - Delete document from Elasticsearch
 - `toJSON()` - Convert to plain object with all field values
 - `toSearch()` - Convert to Elasticsearch document format (same as toJSON)
