@@ -45,7 +45,7 @@ class SearchService {
       if (!process.env.ELASTICSEARCH_URL) {
         throw new Error('ELASTICSEARCH_URL environment variable is required')
       }
-      
+
       this.config = {
         baseUrl: process.env.ELASTICSEARCH_URL,
         maxRetries: 3,
@@ -98,7 +98,7 @@ class SearchService {
     debug('elasticsearch', `[search.executeRequest] Making HTTP request`, {
       url,
       method,
-      hasBody: !!options.body,
+      body: options.body,
       headers: options.headers,
     })
 
