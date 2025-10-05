@@ -147,7 +147,7 @@ describe('SearchModel', () => {
       expect(mapping.mappings).toHaveProperty('properties')
       
       const properties = mapping.mappings.properties
-      expect(properties.id).toEqual({ type: 'keyword' })
+      expect(properties.id).toEqual({ type: 'keyword', fields: { keyword: { type: 'keyword' } } })
       expect(properties.name).toEqual({ 
         type: 'text', 
         fields: { keyword: { type: 'keyword' } } 
@@ -177,7 +177,7 @@ describe('SearchModel', () => {
         type: 'keyword',
         options: {}
       })
-      expect(result).toEqual({ type: 'keyword' })
+      expect(result).toEqual({ type: 'keyword', fields: { keyword: { type: 'keyword' } } })
     })
 
     it('should convert number type correctly', () => {

@@ -101,7 +101,7 @@ export class SearchModel {
             case 'string':
                 return { type: 'text', fields: { keyword: { type: 'keyword' } } };
             case 'keyword':
-                return { type: 'keyword' };
+                return { type: 'keyword', fields: { keyword: { type: 'keyword' } } };
             case 'number':
                 return { type: 'double' };
             case 'date':

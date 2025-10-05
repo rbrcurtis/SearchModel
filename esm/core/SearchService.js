@@ -57,7 +57,7 @@ class SearchService {
         debug('elasticsearch', `[search.executeRequest] Making HTTP request`, {
             url,
             method,
-            hasBody: !!options.body,
+            body: options.body,
             headers: options.headers,
         });
         try {
