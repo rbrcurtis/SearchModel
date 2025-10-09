@@ -163,14 +163,20 @@ class SearchService {
         }
 
         // Don't log 404 errors or 400 "already exists" errors as they're often expected
-        const shouldLogError =
-          response.status !== 404 &&
-          !(
-            response.status === 400 &&
-            errorBody.includes('resource_already_exists_exception')
-          )
+        const isExpectedError =
+          response.status === 404 ||
+          (response.status === 400 &&
+            errorBody.includes('resource_already_exists_exception'))
 
-        if (shouldLogError) {
+        if (isExpectedError) {
+          // Log expected responses for debugging
+          log('Elasticsearch expected response:', {
+            status: `${response.status} ${response.statusText}`,
+            url,
+            method,
+            responsePreview: errorBody.substring(0, 200),
+          })
+        } else {
           logError('Elasticsearch Error Details:', {
             status: `${response.status} ${response.statusText}`,
             url,
@@ -180,14 +186,6 @@ class SearchService {
               data && !['GET', 'HEAD'].includes(method.toUpperCase())
                 ? JSON.stringify(data, null, 2)
                 : undefined,
-          })
-        } else {
-          // Log non-shouldLogError responses for debugging
-          log('Elasticsearch non-error response:', {
-            status: `${response.status} ${response.statusText}`,
-            url,
-            method,
-            responsePreview: errorBody.substring(0, 200),
           })
         }
 
