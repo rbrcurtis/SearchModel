@@ -8,6 +8,7 @@ TypeScript Active Record pattern implementation for Elasticsearch with decorator
 - 🎨 **Decorator-based Validation**: Type-safe field validation using TypeScript decorators
 - 🔄 **Automatic Mapping Generation**: Generate Elasticsearch mappings from your models
 - 📝 **Change Tracking**: Track field modifications for optimized updates
+- ⏰ **Automatic Timestamps**: createdAt and updatedAt managed automatically
 - 🚀 **Batch Updates**: Update multiple properties at once with `.update()` method
 - 🪝 **Lifecycle Hooks**: beforeSave, afterSave, beforeDelete, afterDelete
 - 🔁 **Retry Logic**: Built-in exponential backoff for rate limiting
@@ -49,12 +50,15 @@ import {
 
 class User extends SearchModel {
   static readonly indexName = 'users'
-  
-  @StringType({ 
-    required: true, 
-    trim: true, 
+
+  // Note: id, createdAt, updatedAt, and version are inherited automatically
+  // from SearchModel - you don't need to define them!
+
+  @StringType({
+    required: true,
+    trim: true,
     lowerCase: true,
-    validate: (email) => email.includes('@') 
+    validate: (email) => email.includes('@')
   })
   email!: string
   
@@ -131,9 +135,53 @@ user.update({
 })
 await user.save()
 
+// ⚠️ Important: Array mutations (push, pop, etc.) are NOT tracked
+// Wrong: user.roles.push('editor') - NOT saved!
+// Correct: user.roles = [...user.roles, 'editor']
+user.roles = [...user.roles, 'editor']
+await user.save()
+
 // Delete
 await user.delete()
 ```
+
+## Automatic Fields
+
+All models extending `SearchModel` automatically include these fields without needing to define them:
+
+- **`id`** - Unique document identifier (MongoDB ObjectID format)
+- **`createdAt`** - Timestamp when document was first created
+- **`updatedAt`** - Timestamp when document was last modified
+- **`version`** - Version number for optimistic locking (starts at 1)
+
+### Automatic Timestamp Management
+
+The base class automatically manages timestamps:
+
+```typescript
+// When creating a new document
+const user = await User.create({
+  name: 'John Doe',
+  email: 'john@example.com'
+})
+// createdAt and updatedAt are automatically set to current time
+// version is set to 1
+console.log(user.createdAt) // 2024-01-15T10:30:00.000Z
+console.log(user.updatedAt) // 2024-01-15T10:30:00.000Z
+console.log(user.version)   // 1
+
+// When updating an existing document
+user.name = 'Jane Doe'
+await user.save()
+// updatedAt is automatically updated to current time
+// version is incremented
+// createdAt remains unchanged
+console.log(user.createdAt) // 2024-01-15T10:30:00.000Z (unchanged)
+console.log(user.updatedAt) // 2024-01-15T10:35:00.000Z (updated)
+console.log(user.version)   // 2
+```
+
+You never need to manually set these fields - they are managed automatically by the base class.
 
 ## Field Decorators
 
@@ -149,6 +197,26 @@ await user.delete()
 
 - `@StringArrayType(options)` - Array of strings
 - `@ObjectArrayType(options)` - Array of nested objects
+
+**⚠️ Important: Array Mutation Limitation**
+
+The ORM **cannot detect** array mutations using methods like `.push()`, `.pop()`, `.splice()`, etc. You must reassign the entire array for changes to be tracked:
+
+```typescript
+// ❌ Wrong - changes NOT tracked
+user.roles.push('editor')
+await user.save() // Changes will NOT be saved
+
+// ✅ Correct - reassign the array
+user.roles = [...user.roles, 'editor']
+await user.save() // Changes ARE tracked and saved
+
+// ✅ Also correct
+user.roles = user.roles.concat('editor')
+await user.save()
+```
+
+This applies to all array types including `@StringArrayType()` and `@ObjectArrayType()`.
 
 ### Complex Types
 
@@ -270,6 +338,16 @@ await User.find(['status:active', 'role:admin'])
 // Range queries
 await User.find(['age:[18 TO 65]'])
 
+// Query by automatic fields (createdAt, updatedAt, version)
+await User.find(['createdAt:[2024-01-01 TO 2024-12-31]'])
+await User.find(['updatedAt:[2024-01-01 TO *]'])
+
+// Sort by automatic timestamp fields
+await User.find(['status:active'], {
+  sort: 'createdAt:desc',  // Most recent first
+  limit: 10
+})
+
 // Complex queries
 await User.find([
   'status:active',
@@ -277,7 +355,7 @@ await User.find([
   'email:*@company.com'
 ], {
   limit: 50,
-  sort: 'createdAt:desc',
+  sort: 'updatedAt:desc',  // Sort by last modified
   page: 2
 })
 ```
@@ -385,6 +463,22 @@ class Product extends SearchModel {
   }
 }
 ```
+
+**⚠️ Array Mutation Limitation**
+
+Change tracking works by detecting when property setters are called. Array mutations (`.push()`, `.pop()`, `.splice()`, etc.) modify the array in-place without calling the setter, so they are **not tracked**:
+
+```typescript
+// ❌ Wrong - NOT tracked
+product.tags.push('new-tag')
+console.log(product.getChangedFields()) // [] - empty!
+
+// ✅ Correct - IS tracked
+product.tags = [...product.tags, 'new-tag']
+console.log(product.getChangedFields()) // ['tags']
+```
+
+Always reassign arrays when making changes to ensure proper change tracking.
 
 ## Error Handling
 
