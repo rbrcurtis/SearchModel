@@ -99,10 +99,18 @@ class SearchService {
                     }
                     throw new VersionConflictError('Document version conflict: another process has modified this document', currentVersion, attemptedVersion);
                 }
-                const shouldLogError = response.status !== 404 &&
-                    !(response.status === 400 &&
+                const isExpectedError = response.status === 404 ||
+                    (response.status === 400 &&
                         errorBody.includes('resource_already_exists_exception'));
-                if (shouldLogError) {
+                if (isExpectedError) {
+                    log('Elasticsearch expected response:', {
+                        status: `${response.status} ${response.statusText}`,
+                        url,
+                        method,
+                        responsePreview: errorBody.substring(0, 200),
+                    });
+                }
+                else {
                     logError('Elasticsearch Error Details:', {
                         status: `${response.status} ${response.statusText}`,
                         url,
@@ -111,14 +119,6 @@ class SearchService {
                         requestBody: data && !['GET', 'HEAD'].includes(method.toUpperCase())
                             ? JSON.stringify(data, null, 2)
                             : undefined,
-                    });
-                }
-                else {
-                    log('Elasticsearch non-error response:', {
-                        status: `${response.status} ${response.statusText}`,
-                        url,
-                        method,
-                        responsePreview: errorBody.substring(0, 200),
                     });
                 }
                 throw new SearchError(`Search request failed: ${response.status} ${response.statusText}`, response.status, errorBody);

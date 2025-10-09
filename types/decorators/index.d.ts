@@ -16,6 +16,7 @@ interface ObjectPropertyDefinition {
 }
 interface ObjectFieldOptions extends BaseFieldOptions {
     properties: Record<string, ObjectPropertyDefinition>;
+    nested?: boolean;
 }
 export interface FieldMetadata {
     propertyKey: string;

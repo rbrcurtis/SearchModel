@@ -37,6 +37,7 @@ interface ObjectPropertyDefinition {
 // Object-specific options
 interface ObjectFieldOptions extends BaseFieldOptions {
   properties: Record<string, ObjectPropertyDefinition>
+  nested?: boolean // Only applies to ObjectArrayType - defaults to false
 }
 
 export interface FieldMetadata {

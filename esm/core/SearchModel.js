@@ -120,12 +120,13 @@ export class SearchModel {
                 return { type: 'object', enabled: false };
             case 'objectArray':
                 if (options && 'properties' in options && options.properties) {
+                    const useNested = options.nested === true;
                     return {
-                        type: 'nested',
+                        type: useNested ? 'nested' : 'object',
                         properties: this.buildObjectMapping(options.properties),
                     };
                 }
-                return { type: 'nested', enabled: false };
+                return { type: 'object', enabled: false };
             case 'stringMap':
                 return { type: 'text', fields: { keyword: { type: 'keyword' } } };
             default:
