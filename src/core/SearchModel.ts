@@ -89,14 +89,28 @@ export abstract class SearchModel {
   }
 
   constructor(data: Partial<any> = {}) {
-    // Parse StringMap fields from JSON strings BEFORE Object.assign to avoid validation errors
+    // Parse StringMap and Date fields from JSON BEFORE setting properties to avoid validation errors
     const fieldMetadata = getFieldMetadata(this.constructor.prototype)
     const processedData = { ...data }
 
+    // Create a map of field types for quick lookup
+    const fieldTypeMap = new Map<string, string>()
     for (const field of fieldMetadata) {
-      if (field.type === 'stringMap' && processedData[field.propertyKey]) {
-        const value = processedData[field.propertyKey]
-        if (typeof value === 'string') {
+      fieldTypeMap.set(field.propertyKey, field.type)
+    }
+
+    // Process special field types
+    for (const field of fieldMetadata) {
+      const value = processedData[field.propertyKey]
+
+      if (value !== undefined && value !== null) {
+        // Convert date strings to Date objects
+        if (field.type === 'date' && typeof value === 'string') {
+          processedData[field.propertyKey] = new Date(value)
+        }
+
+        // Parse stringMap JSON strings to objects
+        if (field.type === 'stringMap' && typeof value === 'string') {
           try {
             processedData[field.propertyKey] = JSON.parse(value)
           } catch (e) {
@@ -109,13 +123,7 @@ export abstract class SearchModel {
 
     // Set each property individually to trigger setters and store in private storage
     for (const [key, value] of Object.entries(processedData)) {
-      if (key === 'createdAt' && typeof value === 'string') {
-        this.createdAt = new Date(value)
-      } else if (key === 'updatedAt' && typeof value === 'string') {
-        this.updatedAt = new Date(value)
-      } else {
-        ;(this as any)[key] = value
-      }
+      ;(this as any)[key] = value
     }
 
     // Apply defaults to any undefined fields

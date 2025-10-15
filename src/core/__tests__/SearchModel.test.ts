@@ -110,9 +110,49 @@ describe('SearchModel', () => {
         createdAt: dateString,
         updatedAt: dateString
       })
-      
+
       expect(model.createdAt).toBeInstanceOf(Date)
       expect(model.updatedAt).toBeInstanceOf(Date)
+    })
+
+    it('should parse custom DateType field strings from database', () => {
+      // Simulate loading a document from Elasticsearch where dates are ISO strings
+      const dateString = '1990-06-15T10:30:00.000Z'
+      const model = new TestModel({
+        id: id(),
+        name: 'Test User',
+        birthDate: dateString, // This should be converted to Date automatically
+        version: 1
+      })
+
+      expect(model.birthDate).toBeInstanceOf(Date)
+      expect(model.birthDate.toISOString()).toBe(dateString)
+    })
+
+    it('should parse all date fields from database response', () => {
+      // Simulate a full document from Elasticsearch
+      const createdAtString = '2023-01-01T00:00:00.000Z'
+      const updatedAtString = '2023-06-01T12:00:00.000Z'
+      const birthDateString = '1985-03-20T08:15:00.000Z'
+
+      const model = new TestModel({
+        id: id(),
+        name: 'Test User',
+        createdAt: createdAtString,
+        updatedAt: updatedAtString,
+        birthDate: birthDateString,
+        version: 5
+      })
+
+      // All date fields should be converted to Date objects
+      expect(model.createdAt).toBeInstanceOf(Date)
+      expect(model.updatedAt).toBeInstanceOf(Date)
+      expect(model.birthDate).toBeInstanceOf(Date)
+
+      // Verify the values match
+      expect(model.createdAt.toISOString()).toBe(createdAtString)
+      expect(model.updatedAt.toISOString()).toBe(updatedAtString)
+      expect(model.birthDate.toISOString()).toBe(birthDateString)
     })
   })
 
