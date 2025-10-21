@@ -92,11 +92,11 @@ describe('SearchModel Defaults', () => {
       expect(model.numberField).toBe(42)
       expect(model.dateField).toEqual(new Date('2023-01-01'))
       expect(model.booleanField).toBe(true)
-      expect(model.stringArrayField).toEqual(['item1', 'item2'])
+      expect([...model.stringArrayField]).toEqual(['item1', 'item2'])
       expect(model.keywordField).toBe('default-keyword')
       expect(model.stringMapField).toEqual({ key1: 'value1', key2: 'value2' })
       expect(model.objectField).toEqual({ nested: 'default-nested' })
-      expect(model.objectArrayField).toEqual([
+      expect([...model.objectArrayField]).toEqual([
         { item: 'default-item1' },
         { item: 'default-item2' }
       ])
@@ -140,7 +140,7 @@ describe('SearchModel Defaults', () => {
       expect(model.stringField).toBe('')
       expect(model.numberField).toBe(0)
       expect(model.booleanField).toBe(false)
-      expect(model.stringArrayField).toEqual([])
+      expect([...model.stringArrayField]).toEqual([])
     })
     
     it('should handle partial defaults correctly', () => {
@@ -171,11 +171,11 @@ describe('SearchModel Defaults', () => {
       expect(model.numberField).toBe(42)
       expect(model.dateField).toEqual(new Date('2023-01-01'))
       expect(model.booleanField).toBe(true)
-      expect(model.stringArrayField).toEqual(['item1', 'item2'])
+      expect([...model.stringArrayField]).toEqual(['item1', 'item2'])
       expect(model.keywordField).toBe('default-keyword')
       expect(model.stringMapField).toEqual({ key1: 'value1', key2: 'value2' })
       expect(model.objectField).toEqual({ nested: 'default-nested' })
-      expect(model.objectArrayField).toEqual([
+      expect([...model.objectArrayField]).toEqual([
         { item: 'default-item1' },
         { item: 'default-item2' }
       ])
@@ -220,7 +220,7 @@ describe('SearchModel Defaults', () => {
       expect(model.stringField).toBe('')
       expect(model.numberField).toBe(0)
       expect(model.booleanField).toBe(false)
-      expect(model.stringArrayField).toEqual([])
+      expect([...model.stringArrayField]).toEqual([])
     })
     
     it('should simulate loading old records with new fields', () => {
@@ -245,7 +245,7 @@ describe('SearchModel Defaults', () => {
       expect(model.numberField).toBe(42)
       expect(model.booleanField).toBe(true)
       expect(model.keywordField).toBe('default-keyword')
-      expect(model.stringArrayField).toEqual(['item1', 'item2'])
+      expect([...model.stringArrayField]).toEqual(['item1', 'item2'])
     })
   })
   
@@ -261,10 +261,10 @@ describe('SearchModel Defaults', () => {
       model1.objectArrayField.push({ item: 'new-item' })
       
       // model2 should have pristine defaults
-      expect(model2.stringArrayField).toEqual(['item1', 'item2'])
+      expect([...model2.stringArrayField]).toEqual(['item1', 'item2'])
       expect(model2.stringMapField).toEqual({ key1: 'value1', key2: 'value2' })
       expect(model2.objectField).toEqual({ nested: 'default-nested' })
-      expect(model2.objectArrayField).toEqual([
+      expect([...model2.objectArrayField]).toEqual([
         { item: 'default-item1' },
         { item: 'default-item2' }
       ])

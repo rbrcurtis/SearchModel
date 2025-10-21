@@ -1,3 +1,5 @@
+import { createTrackedArray } from '../utils/arrayProxy'
+
 // Metadata key for storing field type information
 const FIELD_METADATA_KEY = Symbol('fieldMetadata')
 
@@ -222,7 +224,23 @@ function createValidatedProperty(
   Object.defineProperty(target, propertyKey, {
     get: function () {
       const storage = getPrivateStorage(this)
-      return storage[propertyKey]
+      const value = storage[propertyKey]
+
+      // Wrap arrays with proxy for mutation tracking
+      if (value && Array.isArray(value) && (type === 'stringArray' || type === 'objectArray')) {
+        // Only wrap if not already wrapped
+        if (!(value as any).__isTrackedArray) {
+          const trackedArray = createTrackedArray(value, () => {
+            if (this.markFieldChanged) {
+              this.markFieldChanged(propertyKey)
+            }
+          })
+          storage[propertyKey] = trackedArray
+          return trackedArray
+        }
+      }
+
+      return value
     },
     set: function (value: any) {
       const storage = getPrivateStorage(this)
@@ -236,10 +254,22 @@ function createValidatedProperty(
         if (options.validate && !options.validate(value)) {
           throw new Error(`Field '${propertyKey}' failed custom validation`)
         }
-      }
 
-      // Set the new value
-      storage[propertyKey] = value
+        // Wrap arrays with proxy for mutation tracking
+        if (Array.isArray(value) && (type === 'stringArray' || type === 'objectArray')) {
+          const trackedArray = createTrackedArray(value, () => {
+            if (this.markFieldChanged) {
+              this.markFieldChanged(propertyKey)
+            }
+          })
+          storage[propertyKey] = trackedArray
+        } else {
+          storage[propertyKey] = value
+        }
+      } else {
+        // Set the new value
+        storage[propertyKey] = value
+      }
 
       // Track field changes (if the value actually changed and this is a SearchModel instance)
       if (this.markFieldChanged && oldValue !== value) {

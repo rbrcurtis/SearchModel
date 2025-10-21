@@ -77,7 +77,7 @@ describe('SearchModel.update()', () => {
       expect(model.score).toBe(85)
       expect(model.birthDate).toEqual(updateDate)
       expect(model.isActive).toBe(true)
-      expect(model.tags).toEqual(['tag1', 'tag2', 'tag3'])
+      expect([...model.tags]).toEqual(['tag1', 'tag2', 'tag3'])
     })
 
     it('should return the model instance for chaining', () => {
