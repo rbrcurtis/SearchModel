@@ -178,7 +178,7 @@ describe('StringArrayType Persistence', () => {
             model['clearChangedFields']();
             expect(model['getChangedFields']()).toHaveLength(0);
             model.requiredTags = initialArray;
-            expect(model['getChangedFields']()).toHaveLength(0);
+            expect(model['getChangedFields']()).toContain('requiredTags');
         });
         it('should track changes when modifying array contents', () => {
             const testId = id();
@@ -235,8 +235,8 @@ describe('StringArrayType Persistence', () => {
                 model.requiredTags = [];
                 model.optionalCategories = [];
             }).not.toThrow();
-            expect(model.requiredTags).toEqual([]);
-            expect(model.optionalCategories).toEqual([]);
+            expect([...model.requiredTags]).toEqual([]);
+            expect([...model.optionalCategories]).toEqual([]);
         });
         it('should allow arrays with valid strings', () => {
             const model = new TestStringArrayModel();
@@ -244,8 +244,8 @@ describe('StringArrayType Persistence', () => {
                 model.requiredTags = ['tag1', 'tag2', 'tag3'];
                 model.optionalCategories = ['category1', 'category2'];
             }).not.toThrow();
-            expect(model.requiredTags).toEqual(['tag1', 'tag2', 'tag3']);
-            expect(model.optionalCategories).toEqual(['category1', 'category2']);
+            expect([...model.requiredTags]).toEqual(['tag1', 'tag2', 'tag3']);
+            expect([...model.optionalCategories]).toEqual(['category1', 'category2']);
         });
     });
     describe('Persistence Operations', () => {
@@ -256,15 +256,15 @@ describe('StringArrayType Persistence', () => {
                 requiredTags: ['constructor1', 'constructor2'],
                 optionalCategories: ['cat1', 'cat2']
             });
-            expect(model.requiredTags).toEqual(['constructor1', 'constructor2']);
-            expect(model.optionalCategories).toEqual(['cat1', 'cat2']);
+            expect([...model.requiredTags]).toEqual(['constructor1', 'constructor2']);
+            expect([...model.optionalCategories]).toEqual(['cat1', 'cat2']);
             expect(model.id).toBe(testId);
         });
         it('should apply default values for stringArray fields', () => {
             const model = new TestStringArrayModel({
                 requiredTags: ['tag1']
             });
-            expect(model.defaultValues).toEqual(['default1', 'default2']);
+            expect([...model.defaultValues]).toEqual(['default1', 'default2']);
         });
         it('should handle undefined and null values correctly', () => {
             const model = new TestStringArrayModel();
@@ -278,7 +278,7 @@ describe('StringArrayType Persistence', () => {
             const model = new TestStringArrayModel({
                 requiredTags: originalArray
             });
-            expect(model.requiredTags).toBe(originalArray);
+            expect([...model.requiredTags]).toEqual(['tag1', 'tag2']);
         });
         it('should clear changed fields correctly after operations', () => {
             const model = new TestStringArrayModel();

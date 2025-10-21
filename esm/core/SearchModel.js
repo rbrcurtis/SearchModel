@@ -35,10 +35,17 @@ export class SearchModel {
         this._isNewDocument = true;
         const fieldMetadata = getFieldMetadata(this.constructor.prototype);
         const processedData = { ...data };
+        const fieldTypeMap = new Map();
         for (const field of fieldMetadata) {
-            if (field.type === 'stringMap' && processedData[field.propertyKey]) {
-                const value = processedData[field.propertyKey];
-                if (typeof value === 'string') {
+            fieldTypeMap.set(field.propertyKey, field.type);
+        }
+        for (const field of fieldMetadata) {
+            const value = processedData[field.propertyKey];
+            if (value !== undefined && value !== null) {
+                if (field.type === 'date' && typeof value === 'string') {
+                    processedData[field.propertyKey] = new Date(value);
+                }
+                if (field.type === 'stringMap' && typeof value === 'string') {
                     try {
                         processedData[field.propertyKey] = JSON.parse(value);
                     }
@@ -48,16 +55,8 @@ export class SearchModel {
             }
         }
         for (const [key, value] of Object.entries(processedData)) {
-            if (key === 'createdAt' && typeof value === 'string') {
-                this.createdAt = new Date(value);
-            }
-            else if (key === 'updatedAt' && typeof value === 'string') {
-                this.updatedAt = new Date(value);
-            }
-            else {
-                ;
-                this[key] = value;
-            }
+            ;
+            this[key] = value;
         }
         this.applyDefaults();
         if (data.id && data.version) {

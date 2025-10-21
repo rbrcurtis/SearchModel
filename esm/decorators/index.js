@@ -1,3 +1,4 @@
+import { createTrackedArray } from '../utils/arrayProxy';
 const FIELD_METADATA_KEY = Symbol('fieldMetadata');
 export const PRIVATE_STORAGE = Symbol('__privateStorage__');
 export function getFieldMetadata(target) {
@@ -110,7 +111,19 @@ function createValidatedProperty(target, propertyKey, type, options) {
     Object.defineProperty(target, propertyKey, {
         get: function () {
             const storage = getPrivateStorage(this);
-            return storage[propertyKey];
+            const value = storage[propertyKey];
+            if (value && Array.isArray(value) && (type === 'stringArray' || type === 'objectArray')) {
+                if (!value.__isTrackedArray) {
+                    const trackedArray = createTrackedArray(value, () => {
+                        if (this.markFieldChanged) {
+                            this.markFieldChanged(propertyKey);
+                        }
+                    });
+                    storage[propertyKey] = trackedArray;
+                    return trackedArray;
+                }
+            }
+            return value;
         },
         set: function (value) {
             const storage = getPrivateStorage(this);
@@ -120,8 +133,21 @@ function createValidatedProperty(target, propertyKey, type, options) {
                 if (options.validate && !options.validate(value)) {
                     throw new Error(`Field '${propertyKey}' failed custom validation`);
                 }
+                if (Array.isArray(value) && (type === 'stringArray' || type === 'objectArray')) {
+                    const trackedArray = createTrackedArray(value, () => {
+                        if (this.markFieldChanged) {
+                            this.markFieldChanged(propertyKey);
+                        }
+                    });
+                    storage[propertyKey] = trackedArray;
+                }
+                else {
+                    storage[propertyKey] = value;
+                }
             }
-            storage[propertyKey] = value;
+            else {
+                storage[propertyKey] = value;
+            }
             if (this.markFieldChanged && oldValue !== value) {
                 this.markFieldChanged(propertyKey);
             }

@@ -111,6 +111,36 @@ describe('SearchModel', () => {
             expect(model.createdAt).toBeInstanceOf(Date);
             expect(model.updatedAt).toBeInstanceOf(Date);
         });
+        it('should parse custom DateType field strings from database', () => {
+            const dateString = '1990-06-15T10:30:00.000Z';
+            const model = new TestModel({
+                id: id(),
+                name: 'Test User',
+                birthDate: dateString,
+                version: 1
+            });
+            expect(model.birthDate).toBeInstanceOf(Date);
+            expect(model.birthDate.toISOString()).toBe(dateString);
+        });
+        it('should parse all date fields from database response', () => {
+            const createdAtString = '2023-01-01T00:00:00.000Z';
+            const updatedAtString = '2023-06-01T12:00:00.000Z';
+            const birthDateString = '1985-03-20T08:15:00.000Z';
+            const model = new TestModel({
+                id: id(),
+                name: 'Test User',
+                createdAt: createdAtString,
+                updatedAt: updatedAtString,
+                birthDate: birthDateString,
+                version: 5
+            });
+            expect(model.createdAt).toBeInstanceOf(Date);
+            expect(model.updatedAt).toBeInstanceOf(Date);
+            expect(model.birthDate).toBeInstanceOf(Date);
+            expect(model.createdAt.toISOString()).toBe(createdAtString);
+            expect(model.updatedAt.toISOString()).toBe(updatedAtString);
+            expect(model.birthDate.toISOString()).toBe(birthDateString);
+        });
     });
     describe('fromJSON', () => {
         it('should create instance from JSON data', () => {
