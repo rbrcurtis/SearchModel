@@ -5,20 +5,20 @@ import { search, SearchError, VersionConflictError } from '../SearchService'
 import { id } from '../../utils/id'
 
 // Mock the SearchService module
-jest.mock('../SearchService', () => {
-  const actual = jest.requireActual('../SearchService')
+vi.mock('../SearchService', async () => {
+  const actual = await vi.importActual('../SearchService')
   return {
     ...actual,
     search: {
-      searchRequest: jest.fn(),
-      query: jest.fn(),
-      getById: jest.fn()
+      searchRequest: vi.fn(),
+      query: vi.fn(),
+      getById: vi.fn()
     }
   }
 })
 
 // Type the mocked search for TypeScript
-const mockedSearch = search as jest.Mocked<typeof search>
+const mockedSearch = search as Mocked<typeof search>
 
 // Test model class
 class TestModel extends SearchModel {
@@ -68,7 +68,7 @@ class ModelWithHooks extends SearchModel {
 
 describe('SearchModel', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     // Reset mock functions for each test
     mockedSearch.searchRequest.mockReset()
     mockedSearch.query.mockReset()
@@ -517,7 +517,7 @@ describe('SearchModel', () => {
     describe('findOne', () => {
       it('should find first matching document', async () => {
         const testDoc = { id: id(), name: 'First' }
-        jest.spyOn(TestModel, 'find').mockResolvedValue([
+        vi.spyOn(TestModel, 'find').mockResolvedValue([
           new TestModel(testDoc)
         ])
         
@@ -528,7 +528,7 @@ describe('SearchModel', () => {
       })
       
       it('should return null when no documents found', async () => {
-        jest.spyOn(TestModel, 'find').mockResolvedValue([])
+        vi.spyOn(TestModel, 'find').mockResolvedValue([])
         
         const result = await TestModel.findOne(['name:NotFound'])
         

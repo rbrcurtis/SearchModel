@@ -440,6 +440,104 @@ user.update({ name: 'First' })
 await user.save() // Saves all changes
 ```
 
+## Walking Large Datasets
+
+The `walkIndex` utility provides an efficient way to iterate through large numbers of documents with controlled concurrency:
+
+```typescript
+import { walkIndex } from 'search-model'
+
+// Process all active users with 10 concurrent operations
+await walkIndex(
+  User,
+  ['status:active'],
+  async (user) => {
+    // Process each user
+    console.log(`Processing user: ${user.email}`)
+
+    // Update, delete, or perform any async operation
+    user.lastProcessed = new Date()
+    await user.save()
+  },
+  { concurrency: 10 }
+)
+```
+
+### How It Works
+
+- **Efficient Pagination**: Uses search-after pattern with ID sorting for memory-efficient iteration
+- **Batch Processing**: Fetches documents in batches of 100
+- **Controlled Concurrency**: Processes documents with configurable parallelism (default: 10)
+- **Memory Safe**: Collects all matching instances first, then processes with concurrency control
+
+### Parameters
+
+```typescript
+walkIndex<T extends typeof SearchModel>(
+  ModelClass: T,                          // Your SearchModel class
+  terms: string[],                        // Elasticsearch query terms
+  callback: (hit: InstanceType<T>) => Promise<void>,  // Async callback for each document
+  options?: { concurrency?: number }      // Optional concurrency limit (default: 10)
+): Promise<void>
+```
+
+### Example Use Cases
+
+```typescript
+// Bulk update all users created before 2024
+await walkIndex(
+  User,
+  ['createdAt:[* TO 2024-01-01]'],
+  async (user) => {
+    user.migrated = true
+    await user.save()
+  },
+  { concurrency: 20 }
+)
+
+// Process all documents (empty query matches all)
+await walkIndex(
+  Product,
+  [],
+  async (product) => {
+    // Recalculate pricing, update cache, etc.
+    await updateProductCache(product)
+  }
+)
+
+// Delete old records with controlled parallelism
+await walkIndex(
+  LogEntry,
+  ['timestamp:[* TO 2023-01-01]'],
+  async (entry) => {
+    await entry.delete()
+  },
+  { concurrency: 5 } // Lower concurrency for delete operations
+)
+```
+
+### Performance Tips
+
+- **Adjust Concurrency**: Higher values for I/O-bound tasks, lower for CPU-intensive operations
+- **Batch Operations**: Consider batching saves or using bulk operations for better performance
+- **Memory Usage**: The function collects all matching instances before processing - monitor memory for very large datasets
+- **Error Handling**: Wrap callback in try-catch to handle individual document failures
+
+```typescript
+await walkIndex(
+  User,
+  ['status:pending'],
+  async (user) => {
+    try {
+      await processUser(user)
+    } catch (error) {
+      console.error(`Failed to process user ${user.id}:`, error)
+      // Log error but continue processing other users
+    }
+  }
+)
+```
+
 ## Change Tracking
 
 Models automatically track which fields have been modified:
@@ -578,6 +676,15 @@ The service automatically handles:
 - Maximum retry attempts for failed requests: 3
 - Base delay for exponential backoff: 1000ms  
 - Maximum delay between retries: 30000ms
+
+### Utility Functions
+
+- `walkIndex(ModelClass, terms, callback, options?)` - Efficiently iterate through large datasets with controlled concurrency
+  - `ModelClass` - Your SearchModel class
+  - `terms` - Array of Elasticsearch query terms
+  - `callback` - Async function called for each document
+  - `options.concurrency` - Number of concurrent operations (default: 10)
+- `id()` - Generate a MongoDB ObjectID-compatible unique identifier
 
 ### Error Classes
 

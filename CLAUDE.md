@@ -19,6 +19,7 @@ This project uses **Yarn** as the package manager. Do not use npm.
 - `yarn test` - Run all tests
 - `yarn test:watch` - Run tests in watch mode
 - `yarn test:coverage` - Run tests with coverage report
+- `yarn test:ui` - Run tests with interactive UI
 - Run single test file: `yarn test <path-to-test-file>`
   - Example: `yarn test src/core/__tests__/SearchModel.test.ts`
 - Run tests matching pattern: `yarn test -t "<test-name-pattern>"`
@@ -143,10 +144,11 @@ const testId = 'test-id'
 This ensures unique IDs in tests and prevents conflicts.
 
 ### Test Environment
-- Jest configured with `ts-jest` preset
+- Vitest test runner with TypeScript support
 - Node environment
-- Tests run against actual Elasticsearch (requires `ELASTICSEARCH_URL` in env)
+- Tests run against actual Elasticsearch (defaults to `http://localhost:9200`)
 - Most tests create and delete their own indices using unique IDs
+- Global test helpers available via `globals: true` configuration
 
 ## Key Behaviors to Understand
 

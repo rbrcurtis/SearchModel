@@ -336,7 +336,7 @@ describe('SearchModel.update()', () => {
       const model = new UpdateTestModel({ name: 'Original' })
 
       // Mock save method to ensure it's not called
-      const saveSpy = jest.spyOn(model, 'save')
+      const saveSpy = vi.spyOn(model, 'save')
 
       model.update({ name: 'Updated' })
 

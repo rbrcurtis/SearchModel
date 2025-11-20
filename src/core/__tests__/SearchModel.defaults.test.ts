@@ -12,6 +12,20 @@ import {
   StringMapType
 } from '../../decorators'
 import { id } from '../../utils/id'
+import { search } from '../SearchService'
+
+// Mock the SearchService module
+vi.mock('../SearchService', async () => {
+  const actual = await vi.importActual('../SearchService')
+  return {
+    ...actual,
+    search: {
+      searchRequest: vi.fn(),
+      query: vi.fn(),
+      getById: vi.fn()
+    }
+  }
+})
 
 // Test model with defaults for all field types
 class TestModelWithDefaults extends SearchModel {
@@ -274,26 +288,25 @@ describe('SearchModel Defaults', () => {
   describe('Save Method Defaults', () => {
     it('should apply defaults during save for new documents', async () => {
       // Mock the searchService
-      const searchService = require('../SearchService')
-      searchService.search.searchRequest = jest.fn().mockResolvedValue({
+      vi.mocked(search.searchRequest).mockResolvedValue({
         _id: 'test-id',
         _version: 1
-      })
-      
+      } as any)
+
       // Create a model with only some fields provided
       const model = new TestModelPartialDefaults({
         withoutDefault: 'provided-value'
         // withDefault is not provided, should get default
       })
-      
+
       await model.save()
-      
+
       // The default should be applied
       expect(model.withDefault).toBe('has-default')
       expect(model.withoutDefault).toBe('provided-value')
-      
+
       // Verify that defaults were included in the saved document
-      const savedData = searchService.search.searchRequest.mock.calls[0][2]
+      const savedData = vi.mocked(search.searchRequest).mock.calls[0][2]
       expect(savedData.withDefault).toBe('has-default')
       expect(savedData.withoutDefault).toBe('provided-value')
     })

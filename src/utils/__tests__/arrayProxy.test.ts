@@ -2,11 +2,11 @@ import { createTrackedArray } from '../arrayProxy'
 
 describe('createTrackedArray', () => {
   let mutationCount: number
-  let onMutate: jest.Mock
+  let onMutate: Mock
 
   beforeEach(() => {
     mutationCount = 0
-    onMutate = jest.fn(() => mutationCount++)
+    onMutate = vi.fn(() => mutationCount++)
   })
 
   describe('mutating methods', () => {

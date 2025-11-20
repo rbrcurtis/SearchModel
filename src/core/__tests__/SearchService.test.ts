@@ -2,15 +2,14 @@ import { search, SearchError, VersionConflictError } from '../SearchService'
 import { id } from '../../utils/id'
 
 // Mock fetch globally
-global.fetch = jest.fn()
+global.fetch = vi.fn()
 
 describe('SearchService', () => {
   const originalEnv = process.env
 
   beforeEach(() => {
-    jest.resetModules()
     process.env = { ...originalEnv, ELASTICSEARCH_URL: 'http://localhost:9200' }
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     // Reset the config for each test
     ;(search as any)._resetConfig()
   })
@@ -24,7 +23,7 @@ describe('SearchService', () => {
     it('should use ELASTICSEARCH_URL from environment', async () => {
       process.env.ELASTICSEARCH_URL = 'http://custom:9200'
       
-      ;(global.fetch as jest.Mock).mockResolvedValueOnce({
+      ;(global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         status: 200,
         json: async () => ({ success: true })
@@ -41,7 +40,7 @@ describe('SearchService', () => {
   describe('searchRequest', () => {
     it('should make successful request', async () => {
       const mockResponse = { _id: 'test', _version: 1 }
-      ;(global.fetch as jest.Mock).mockResolvedValueOnce({
+      ;(global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         status: 200,
         statusText: 'OK',
@@ -62,7 +61,7 @@ describe('SearchService', () => {
 
     it('should include body for POST requests', async () => {
       const requestBody = { query: { match_all: {} } }
-      ;(global.fetch as jest.Mock).mockResolvedValueOnce({
+      ;(global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         status: 200,
         json: async () => ({ hits: [] })
@@ -80,7 +79,7 @@ describe('SearchService', () => {
     })
 
     it('should add version parameters when provided', async () => {
-      ;(global.fetch as jest.Mock).mockResolvedValueOnce({
+      ;(global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         status: 200,
         json: async () => ({})
@@ -95,7 +94,7 @@ describe('SearchService', () => {
     })
 
     it('should handle 404 errors', async () => {
-      ;(global.fetch as jest.Mock).mockResolvedValueOnce({
+      ;(global.fetch as Mock).mockResolvedValueOnce({
         ok: false,
         status: 404,
         statusText: 'Not Found',
@@ -115,7 +114,7 @@ describe('SearchService', () => {
         }
       })
 
-      ;(global.fetch as jest.Mock).mockResolvedValueOnce({
+      ;(global.fetch as Mock).mockResolvedValueOnce({
         ok: false,
         status: 409,
         statusText: 'Conflict',
@@ -128,7 +127,7 @@ describe('SearchService', () => {
     })
 
     it('should retry on rate limit (429)', async () => {
-      ;(global.fetch as jest.Mock)
+      ;(global.fetch as Mock)
         .mockResolvedValueOnce({
           ok: false,
           status: 429,
@@ -147,7 +146,7 @@ describe('SearchService', () => {
     })
 
     it('should retry on network errors', async () => {
-      ;(global.fetch as jest.Mock)
+      ;(global.fetch as Mock)
         .mockRejectedValueOnce(new Error('Network error'))
         .mockResolvedValueOnce({
           ok: true,
@@ -162,7 +161,7 @@ describe('SearchService', () => {
     })
 
     it('should throw after max retries', async () => {
-      ;(global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'))
+      ;(global.fetch as Mock).mockRejectedValue(new Error('Network error'))
 
       await expect(
         search.searchRequest('GET', '/test-index/_doc/123')
@@ -182,7 +181,7 @@ describe('SearchService', () => {
         }
       }
 
-      ;(global.fetch as jest.Mock).mockResolvedValueOnce({
+      ;(global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         status: 200,
         json: async () => mockResponse
@@ -213,7 +212,7 @@ describe('SearchService', () => {
         }
       }
 
-      ;(global.fetch as jest.Mock).mockResolvedValueOnce({
+      ;(global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         status: 200,
         json: async () => mockResponse
@@ -227,7 +226,7 @@ describe('SearchService', () => {
     })
 
     it('should handle query options', async () => {
-      ;(global.fetch as jest.Mock).mockResolvedValueOnce({
+      ;(global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         status: 200,
         json: async () => ({ hits: { total: 0, hits: [] } })
@@ -246,14 +245,14 @@ describe('SearchService', () => {
         })
       )
 
-      const callArgs = (global.fetch as jest.Mock).mock.calls[0][1]
+      const callArgs = (global.fetch as Mock).mock.calls[0][1]
       const body = JSON.parse(callArgs.body)
       expect(body.sort).toEqual([{ createdAt: { order: 'desc' } }])
       expect(body.from).toBe(50) // (page 2 - 1) * limit
     })
 
     it('should return empty results for 404 index not found', async () => {
-      ;(global.fetch as jest.Mock).mockResolvedValueOnce({
+      ;(global.fetch as Mock).mockResolvedValueOnce({
         ok: false,
         status: 404,
         statusText: 'Not Found',
@@ -280,7 +279,7 @@ describe('SearchService', () => {
       }
 
       const testId = id()
-      ;(global.fetch as jest.Mock).mockResolvedValueOnce({
+      ;(global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         status: 200,
         json: async () => ({
@@ -309,7 +308,7 @@ describe('SearchService', () => {
       }
 
       const nonExistentId = id()
-      ;(global.fetch as jest.Mock).mockResolvedValueOnce({
+      ;(global.fetch as Mock).mockResolvedValueOnce({
         ok: true,
         status: 200,
         json: async () => ({ found: false })
@@ -332,7 +331,7 @@ describe('SearchService', () => {
       }
 
       const testId = id()
-      ;(global.fetch as jest.Mock).mockResolvedValueOnce({
+      ;(global.fetch as Mock).mockResolvedValueOnce({
         ok: false,
         status: 404,
         statusText: 'Not Found',

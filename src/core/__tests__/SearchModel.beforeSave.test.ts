@@ -5,20 +5,20 @@ import { search } from '../SearchService'
 import { id } from '../../utils/id'
 
 // Mock the SearchService module
-jest.mock('../SearchService', () => {
-  const actual = jest.requireActual('../SearchService')
+vi.mock('../SearchService', async () => {
+  const actual = await vi.importActual('../SearchService')
   return {
     ...actual,
     search: {
-      searchRequest: jest.fn(),
-      query: jest.fn(),
-      getById: jest.fn()
+      searchRequest: vi.fn(),
+      query: vi.fn(),
+      getById: vi.fn()
     }
   }
 })
 
 // Type the mocked search for TypeScript
-const mockedSearch = search as jest.Mocked<typeof search>
+const mockedSearch = search as Mocked<typeof search>
 
 // Test model that sets properties in beforeSave
 class BlogPost extends SearchModel {
@@ -114,7 +114,7 @@ class Product extends SearchModel {
 
 describe('SearchModel beforeSave Property Persistence', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     mockedSearch.searchRequest.mockReset()
   })
 
