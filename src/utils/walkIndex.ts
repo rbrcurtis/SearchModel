@@ -47,7 +47,7 @@ export async function walkIndex<T extends typeof SearchModel>(
 
     const results = await search.query(indexName, queryTerms, {
       limit: size,
-      sort: 'id',
+      sort: 'id.keyword',
     })
 
     if (results.hits.length === 0) {

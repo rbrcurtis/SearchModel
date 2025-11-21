@@ -30,7 +30,7 @@ export async function walkIndex(ModelClass, terms, callback, options = {}) {
         }
         const results = await search.query(indexName, queryTerms, {
             limit: size,
-            sort: 'id',
+            sort: 'id.keyword',
         });
         if (results.hits.length === 0) {
             break;

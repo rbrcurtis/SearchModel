@@ -278,6 +278,9 @@ export class SearchModel {
         }
     }
     async save(options = {}) {
+        debug('search', `[SearchModel.save] Starting save for ${this.constructor.name} (ID: ${this.id})`, {
+            options,
+        });
         const indexName = this.constructor.indexName;
         if (!indexName) {
             throw new Error(`IndexName not defined for ${this.constructor.name}`);

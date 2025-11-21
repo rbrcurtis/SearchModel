@@ -440,6 +440,13 @@ export abstract class SearchModel {
 
   // Instance methods
   public async save(options: SaveOptions = {}): Promise<this> {
+    debug(
+      'search',
+      `[SearchModel.save] Starting save for ${this.constructor.name} (ID: ${this.id})`,
+      {
+        options,
+      }
+    )
     const indexName = (this.constructor as any).indexName
     if (!indexName) {
       throw new Error(`IndexName not defined for ${this.constructor.name}`)
