@@ -322,8 +322,8 @@ export class SearchModel {
                 debug('search', `[SearchModel.save] Updated version from ES response: ${result._version}`);
             }
             this._isNewDocument = false;
-            this.clearChangedFields();
             await this.afterSave(saveEvent);
+            this.clearChangedFields();
             debug('search', `[SearchModel.save] Save successful for ${this.constructor.name} (ID: ${this.id})`);
             return this;
         }
@@ -419,7 +419,7 @@ export class SearchModel {
     }
     update(data) {
         const fieldMetadata = getFieldMetadata(this.constructor.prototype);
-        const validFields = new Set(fieldMetadata.map(field => field.propertyKey));
+        const validFields = new Set(fieldMetadata.map((field) => field.propertyKey));
         for (const [key, value] of Object.entries(data)) {
             if (validFields.has(key)) {
                 ;

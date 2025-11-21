@@ -529,11 +529,11 @@ export abstract class SearchModel {
       // Mark as no longer a new document after successful save
       this._isNewDocument = false
 
-      // Clear changed fields after successful save
-      this.clearChangedFields()
-
       // Call afterSave lifecycle hook
       await this.afterSave(saveEvent)
+
+      // Clear changed fields after successful save
+      this.clearChangedFields()
 
       debug(
         'search',
@@ -674,7 +674,7 @@ export abstract class SearchModel {
   // Update multiple properties at once without saving
   public update(data: Record<string, any>): this {
     const fieldMetadata = getFieldMetadata(this.constructor.prototype)
-    const validFields = new Set(fieldMetadata.map(field => field.propertyKey))
+    const validFields = new Set(fieldMetadata.map((field) => field.propertyKey))
 
     for (const [key, value] of Object.entries(data)) {
       // Only update properties that are valid model attributes
