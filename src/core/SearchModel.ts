@@ -72,8 +72,9 @@ export abstract class SearchModel {
   }
 
   // Lifecycle hooks - can be overridden by child classes
-  protected async beforeSave(event: SaveEvent): Promise<void> {
+  protected async beforeSave(event: SaveEvent): Promise<boolean> {
     // Default implementation - does nothing
+    return true
   }
 
   protected async afterSave(event: SaveEvent): Promise<void> {
@@ -452,7 +453,13 @@ export abstract class SearchModel {
     const saveEvent: SaveEvent = { updated: changedFields }
 
     // Call beforeSave lifecycle hook
-    await this.beforeSave(saveEvent)
+    const canSave = await this.beforeSave(saveEvent)
+    if (!canSave) {
+      logWarn(
+        `[SearchModel.save] Before save hook returned false for ${this.constructor.name} (ID: ${this.id})`
+      )
+      return this
+    }
 
     // Apply defaults after beforeSave but before validation
     this.applyDefaults()

@@ -11,7 +11,7 @@ import 'reflect-metadata';
 import { search as searchService, SearchError, VersionConflictError, } from './SearchService';
 import { getFieldMetadata, StringType, DateType, NumberType, PRIVATE_STORAGE, } from '../decorators';
 import { id } from '../utils/id';
-import { logError, debug } from '../utils/logging';
+import { logError, logWarn, debug } from '../utils/logging';
 export class SearchModel {
     markFieldChanged(fieldName) {
         this._changedFields.add(fieldName);
@@ -23,6 +23,7 @@ export class SearchModel {
         this._changedFields.clear();
     }
     async beforeSave(event) {
+        return true;
     }
     async afterSave(event) {
     }
@@ -284,7 +285,11 @@ export class SearchModel {
         const wait = options.wait ?? true;
         const changedFields = this.getChangedFields();
         const saveEvent = { updated: changedFields };
-        await this.beforeSave(saveEvent);
+        const canSave = await this.beforeSave(saveEvent);
+        if (!canSave) {
+            logWarn(`[SearchModel.save] Before save hook returned false for ${this.constructor.name} (ID: ${this.id})`);
+            return this;
+        }
         this.applyDefaults();
         this.validateRequiredFields();
         const now = new Date();

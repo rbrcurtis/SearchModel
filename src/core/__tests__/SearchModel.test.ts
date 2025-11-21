@@ -49,8 +49,9 @@ class ModelWithHooks extends SearchModel {
   beforeDeleteCalled = false
   afterDeleteCalled = false
   
-  protected async beforeSave(event: any): Promise<void> {
+  protected async beforeSave(event: any): Promise<boolean> {
     this.beforeSaveCalled = true
+    return true
   }
   
   protected async afterSave(event: any): Promise<void> {

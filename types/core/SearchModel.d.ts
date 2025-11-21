@@ -24,7 +24,7 @@ export declare abstract class SearchModel {
     protected markFieldChanged(fieldName: string): void;
     protected getChangedFields(): string[];
     protected clearChangedFields(): void;
-    protected beforeSave(event: SaveEvent): Promise<void>;
+    protected beforeSave(event: SaveEvent): Promise<boolean>;
     protected afterSave(event: SaveEvent): Promise<void>;
     protected beforeDelete(event: DeleteEvent): Promise<void>;
     protected afterDelete(event: DeleteEvent): Promise<void>;

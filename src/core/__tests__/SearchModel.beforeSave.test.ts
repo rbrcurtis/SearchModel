@@ -42,7 +42,7 @@ class BlogPost extends SearchModel {
   @StringType()
   status!: string
 
-  protected async beforeSave(event: SaveEvent): Promise<void> {
+  protected async beforeSave(event: SaveEvent): Promise<boolean> {
     // Auto-generate slug from title if not provided
     if (!this.slug && this.title) {
       this.slug = this.title
@@ -68,6 +68,8 @@ class BlogPost extends SearchModel {
     if (!this.status) {
       this.status = 'draft'
     }
+
+    return true
   }
 }
 
@@ -90,7 +92,7 @@ class Product extends SearchModel {
   @NumberType()
   discountPercent!: number
 
-  protected async beforeSave(event: SaveEvent): Promise<void> {
+  protected async beforeSave(event: SaveEvent): Promise<boolean> {
     // Apply automatic discount for expensive items
     if (this.price >= 1000 && !this.discountPercent) {
       this.discountPercent = 10
@@ -109,6 +111,8 @@ class Product extends SearchModel {
     } else if (!this.category) {
       this.category = 'standard'
     }
+
+    return true
   }
 }
 
@@ -392,9 +396,10 @@ describe('SearchModel beforeSave Property Persistence', () => {
         @StringType({ default: () => 'default-value' })
         optionalField!: string
 
-        protected async beforeSave(event: SaveEvent): Promise<void> {
+        protected async beforeSave(event: SaveEvent): Promise<boolean> {
           callOrder.push('beforeSave')
           this.name = 'set-in-beforeSave'
+          return true
         }
       }
 
