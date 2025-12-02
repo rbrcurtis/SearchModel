@@ -33,7 +33,7 @@ export interface SaveOptions {
   wait?: boolean
 }
 
-export abstract class SearchModel<T = any> {
+export abstract class SearchModel<T extends SearchModel<T>> {
   // Abstract properties that must be implemented by subclasses
   static readonly indexName: string
 
@@ -137,7 +137,7 @@ export abstract class SearchModel<T = any> {
   }
 
   // Static factory method for creating instances from JSON data
-  static fromJSON<T extends SearchModel>(
+  static fromJSON<T extends SearchModel<T>>(
     this: new (data?: Partial<T>) => T,
     properties: Partial<T>
   ): T {
@@ -149,7 +149,7 @@ export abstract class SearchModel<T = any> {
   }
 
   // Generate Elasticsearch mapping from decorator metadata
-  static generateMapping<T extends SearchModel>(
+  static generateMapping<T extends SearchModel<T>>(
     this: new (data?: Partial<T>) => T & { constructor: typeof SearchModel }
   ): Record<string, any> {
     const fieldMetadata = getFieldMetadata(this.prototype)
@@ -256,7 +256,7 @@ export abstract class SearchModel<T = any> {
   }
 
   // Create or update Elasticsearch index with proper mapping
-  static async createIndex<T extends SearchModel>(
+  static async createIndex<T extends SearchModel<T>>(
     this: new (data?: Partial<T>) => T & { constructor: typeof SearchModel }
   ): Promise<void> {
     const indexName = (this as any).indexName
@@ -316,7 +316,7 @@ export abstract class SearchModel<T = any> {
   }
 
   // Static methods for database operations
-  static async create<T extends SearchModel>(
+  static async create<T extends SearchModel<T>>(
     this: new (data?: Partial<T>) => T,
     properties: Partial<T>,
     options: SaveOptions = {}
@@ -336,7 +336,7 @@ export abstract class SearchModel<T = any> {
     return instance
   }
 
-  static async find<T extends SearchModel>(
+  static async find<T extends SearchModel<T>>(
     this: new (data?: Partial<T>) => T,
     terms: string[] = [],
     options: SearchOptions = {}
@@ -362,7 +362,7 @@ export abstract class SearchModel<T = any> {
     }
   }
 
-  static async findWithTotal<T extends SearchModel>(
+  static async findWithTotal<T extends SearchModel<T>>(
     this: new (data?: Partial<T>) => T,
     terms: string[] = [],
     options: SearchOptions = {}
@@ -381,7 +381,7 @@ export abstract class SearchModel<T = any> {
     }
   }
 
-  static async findOne<T extends SearchModel>(
+  static async findOne<T extends SearchModel<T>>(
     this: new (data?: Partial<T>) => T,
     terms: string[]
   ): Promise<T | null> {
@@ -389,7 +389,7 @@ export abstract class SearchModel<T = any> {
     return results.length > 0 ? results[0] : null
   }
 
-  static async getById<T extends SearchModel>(
+  static async getById<T extends SearchModel<T>>(
     this: new (data?: Partial<T>) => T,
     id: string
   ): Promise<T | null> {
