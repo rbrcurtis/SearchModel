@@ -33,7 +33,7 @@ export interface SaveOptions {
   wait?: boolean
 }
 
-export abstract class SearchModel {
+export abstract class SearchModel<T = any> {
   // Abstract properties that must be implemented by subclasses
   static readonly indexName: string
 
@@ -89,10 +89,10 @@ export abstract class SearchModel {
     // Default implementation - does nothing
   }
 
-  constructor(data: Partial<any> = {}) {
+  constructor(data?: Partial<T>) {
     // Parse StringMap and Date fields from JSON BEFORE setting properties to avoid validation errors
     const fieldMetadata = getFieldMetadata(this.constructor.prototype)
-    const processedData = { ...data }
+    const processedData = { ...(data as any) }
 
     // Create a map of field types for quick lookup
     const fieldTypeMap = new Map<string, string>()
@@ -131,15 +131,15 @@ export abstract class SearchModel {
     this.applyDefaults()
 
     // If we have data with an id and version, this is an existing document
-    if (data.id && data.version) {
+    if ((data as any)?.id && (data as any)?.version) {
       this._isNewDocument = false
     }
   }
 
   // Static factory method for creating instances from JSON data
   static fromJSON<T extends SearchModel>(
-    this: new (data?: any) => T,
-    properties: any
+    this: new (data?: Partial<T>) => T,
+    properties: Partial<T>
   ): T {
     // If properties is already an instance of this class, return it as-is
     if (properties instanceof this) {
@@ -150,7 +150,7 @@ export abstract class SearchModel {
 
   // Generate Elasticsearch mapping from decorator metadata
   static generateMapping<T extends SearchModel>(
-    this: new (data?: any) => T & { constructor: typeof SearchModel }
+    this: new (data?: Partial<T>) => T & { constructor: typeof SearchModel }
   ): Record<string, any> {
     const fieldMetadata = getFieldMetadata(this.prototype)
 
@@ -257,7 +257,7 @@ export abstract class SearchModel {
 
   // Create or update Elasticsearch index with proper mapping
   static async createIndex<T extends SearchModel>(
-    this: new (data?: any) => T & { constructor: typeof SearchModel }
+    this: new (data?: Partial<T>) => T & { constructor: typeof SearchModel }
   ): Promise<void> {
     const indexName = (this as any).indexName
     if (!indexName) {
@@ -317,7 +317,7 @@ export abstract class SearchModel {
 
   // Static methods for database operations
   static async create<T extends SearchModel>(
-    this: new (data?: any) => T,
+    this: new (data?: Partial<T>) => T,
     properties: Partial<T>,
     options: SaveOptions = {}
   ): Promise<T> {
@@ -337,7 +337,7 @@ export abstract class SearchModel {
   }
 
   static async find<T extends SearchModel>(
-    this: new (data?: any) => T,
+    this: new (data?: Partial<T>) => T,
     terms: string[] = [],
     options: SearchOptions = {}
   ): Promise<T[]> {
@@ -363,7 +363,7 @@ export abstract class SearchModel {
   }
 
   static async findWithTotal<T extends SearchModel>(
-    this: new (data?: any) => T,
+    this: new (data?: Partial<T>) => T,
     terms: string[] = [],
     options: SearchOptions = {}
   ): Promise<{ hits: T[]; total: number }> {
@@ -382,7 +382,7 @@ export abstract class SearchModel {
   }
 
   static async findOne<T extends SearchModel>(
-    this: new (data?: any) => T,
+    this: new (data?: Partial<T>) => T,
     terms: string[]
   ): Promise<T | null> {
     const results = await (this as any).find(terms, { limit: 1 })
@@ -390,7 +390,7 @@ export abstract class SearchModel {
   }
 
   static async getById<T extends SearchModel>(
-    this: new (data?: any) => T,
+    this: new (data?: Partial<T>) => T,
     id: string
   ): Promise<T | null> {
     return await searchService.getById(this as any, id)

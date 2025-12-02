@@ -246,9 +246,9 @@ class SearchService {
   async query<T extends any>(
     ModelClass:
       | string
-      | ((new (data?: any) => T) & {
+      | ((new (data?: Partial<T>) => T) & {
           indexName: string
-          fromJSON: (data: any) => T
+          fromJSON: (data: Partial<T>) => T
         }),
     terms: string[],
     options: { limit?: number; sort?: string; page?: number } = {}
@@ -339,9 +339,9 @@ class SearchService {
   }
 
   async getById<T extends any>(
-    ModelClass: (new (data?: any) => T) & {
+    ModelClass: (new (data?: Partial<T>) => T) & {
       indexName: string
-      fromJSON: (data: any) => T
+      fromJSON: (data: Partial<T>) => T
     },
     id: string
   ): Promise<T | null> {

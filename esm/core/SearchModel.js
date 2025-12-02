@@ -31,7 +31,7 @@ export class SearchModel {
     }
     async afterDelete(event) {
     }
-    constructor(data = {}) {
+    constructor(data) {
         this._changedFields = new Set();
         this._isNewDocument = true;
         const fieldMetadata = getFieldMetadata(this.constructor.prototype);
@@ -60,7 +60,7 @@ export class SearchModel {
             this[key] = value;
         }
         this.applyDefaults();
-        if (data.id && data.version) {
+        if (data?.id && data?.version) {
             this._isNewDocument = false;
         }
     }

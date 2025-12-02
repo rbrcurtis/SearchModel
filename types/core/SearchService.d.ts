@@ -19,9 +19,9 @@ declare class SearchService {
     searchRequest(method: string, path: string, data?: any, options?: {
         version?: number;
     }): Promise<any>;
-    query<T extends any>(ModelClass: string | ((new (data?: any) => T) & {
+    query<T extends any>(ModelClass: string | ((new (data?: Partial<T>) => T) & {
         indexName: string;
-        fromJSON: (data: any) => T;
+        fromJSON: (data: Partial<T>) => T;
     }), terms: string[], options?: {
         limit?: number;
         sort?: string;
@@ -30,9 +30,9 @@ declare class SearchService {
         hits: T[];
         total: number;
     }>;
-    getById<T extends any>(ModelClass: (new (data?: any) => T) & {
+    getById<T extends any>(ModelClass: (new (data?: Partial<T>) => T) & {
         indexName: string;
-        fromJSON: (data: any) => T;
+        fromJSON: (data: Partial<T>) => T;
     }, id: string): Promise<T | null>;
 }
 export declare const search: SearchService;
