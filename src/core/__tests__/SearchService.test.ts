@@ -1,8 +1,9 @@
+import { Mock } from 'vitest'
 import { search, SearchError, VersionConflictError } from '../SearchService'
 import { id } from '../../utils/id'
 
 // Mock fetch globally
-global.fetch = vi.fn()
+global.fetch = vi.fn() as Mock
 
 describe('SearchService', () => {
   const originalEnv = process.env

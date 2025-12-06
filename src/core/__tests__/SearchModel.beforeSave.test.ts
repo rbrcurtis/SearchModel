@@ -1,4 +1,5 @@
 import 'reflect-metadata'
+import { Mocked } from 'vitest'
 import { SearchModel, SaveEvent } from '../SearchModel'
 import { StringType, NumberType, DateType } from '../../decorators'
 import { search } from '../SearchService'
@@ -21,7 +22,7 @@ vi.mock('../SearchService', async () => {
 const mockedSearch = search as Mocked<typeof search>
 
 // Test model that sets properties in beforeSave
-class BlogPost extends SearchModel {
+class BlogPost extends SearchModel<BlogPost> {
   static readonly indexName = 'blog-posts'
 
   @StringType({ required: true })
@@ -74,7 +75,7 @@ class BlogPost extends SearchModel {
 }
 
 // Test model that modifies existing properties in beforeSave
-class Product extends SearchModel {
+class Product extends SearchModel<Product> {
   static readonly indexName = 'products'
 
   @StringType({ required: true })
@@ -383,11 +384,11 @@ describe('SearchModel beforeSave Property Persistence', () => {
   })
 
   describe('beforeSave order of operations', () => {
-    it('should call beforeSave before validation and defaults', async () => {
+    it('should call beforeSave, then applyDefaults, then validation during save', async () => {
       const testId = id()
       const callOrder: string[] = []
 
-      class TestModel extends SearchModel {
+      class TestModel extends SearchModel<TestModel> {
         static readonly indexName = 'test'
 
         @StringType({ required: true })
@@ -426,8 +427,9 @@ describe('SearchModel beforeSave Property Persistence', () => {
 
       await model.save()
 
-      // Verify the correct order of operations (applyDefaults is called in constructor, then beforeSave, then applyDefaults again, then validation)
-      expect(callOrder).toEqual(['applyDefaults', 'beforeSave', 'applyDefaults', 'validateRequiredFields'])
+      // Verify the correct order: beforeSave -> applyDefaults -> validateRequiredFields
+      // (applyDefaults is NOT called in constructor anymore)
+      expect(callOrder).toEqual(['beforeSave', 'applyDefaults', 'validateRequiredFields'])
 
       // Verify the property set in beforeSave was used for validation
       expect(model.name).toBe('set-in-beforeSave')

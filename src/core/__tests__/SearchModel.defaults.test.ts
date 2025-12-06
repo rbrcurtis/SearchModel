@@ -28,7 +28,7 @@ vi.mock('../SearchService', async () => {
 })
 
 // Test model with defaults for all field types
-class TestModelWithDefaults extends SearchModel {
+class TestModelWithDefaults extends SearchModel<TestModelWithDefaults> {
   static readonly indexName = 'test-defaults-index'
   
   @StringType({ default: () => 'default-string' })
@@ -70,7 +70,7 @@ class TestModelWithDefaults extends SearchModel {
 }
 
 // Test model with some fields having defaults and others not
-class TestModelPartialDefaults extends SearchModel {
+class TestModelPartialDefaults extends SearchModel<TestModelPartialDefaults> {
   static readonly indexName = 'test-partial-defaults-index'
   
   @StringType({ default: () => 'has-default' })
@@ -87,7 +87,7 @@ class TestModelPartialDefaults extends SearchModel {
 }
 
 // Test model with required fields and defaults
-class TestModelRequiredWithDefaults extends SearchModel {
+class TestModelRequiredWithDefaults extends SearchModel<TestModelRequiredWithDefaults> {
   static readonly indexName = 'test-required-defaults-index'
   
   @StringType({ required: true, default: () => 'required-default' })
@@ -98,51 +98,49 @@ class TestModelRequiredWithDefaults extends SearchModel {
 }
 
 describe('SearchModel Defaults', () => {
-  describe('Constructor Defaults', () => {
-    it('should apply defaults to undefined fields in constructor', () => {
+  describe('Constructor Behavior (No Defaults)', () => {
+    it('should NOT apply defaults in constructor - defaults applied during save', () => {
       const model = new TestModelWithDefaults()
-      
-      expect(model.stringField).toBe('default-string')
-      expect(model.numberField).toBe(42)
-      expect(model.dateField).toEqual(new Date('2023-01-01'))
-      expect(model.booleanField).toBe(true)
-      expect([...model.stringArrayField]).toEqual(['item1', 'item2'])
-      expect(model.keywordField).toBe('default-keyword')
-      expect(model.stringMapField).toEqual({ key1: 'value1', key2: 'value2' })
-      expect(model.objectField).toEqual({ nested: 'default-nested' })
-      expect([...model.objectArrayField]).toEqual([
-        { item: 'default-item1' },
-        { item: 'default-item2' }
-      ])
+
+      // Defaults are NOT applied in constructor
+      expect(model.stringField).toBeUndefined()
+      expect(model.numberField).toBeUndefined()
+      expect(model.dateField).toBeUndefined()
+      expect(model.booleanField).toBeUndefined()
+      expect(model.stringArrayField).toBeUndefined()
+      expect(model.keywordField).toBeUndefined()
+      expect(model.stringMapField).toBeUndefined()
+      expect(model.objectField).toBeUndefined()
+      expect(model.objectArrayField).toBeUndefined()
     })
-    
-    it('should not override provided values with defaults', () => {
+
+    it('should preserve provided values in constructor', () => {
       const model = new TestModelWithDefaults({
         stringField: 'custom-value',
         numberField: 999,
         booleanField: false
       })
-      
+
       expect(model.stringField).toBe('custom-value')
       expect(model.numberField).toBe(999)
       expect(model.booleanField).toBe(false)
-      // Other fields should still get defaults
-      expect(model.dateField).toEqual(new Date('2023-01-01'))
-      expect(model.keywordField).toBe('default-keyword')
+      // Other fields remain undefined (no defaults in constructor)
+      expect(model.dateField).toBeUndefined()
+      expect(model.keywordField).toBeUndefined()
     })
-    
-    it('should not override null values with defaults', () => {
+
+    it('should preserve null values in constructor', () => {
       const model = new TestModelWithDefaults({
-        stringField: null,
-        numberField: null
+        stringField: null as any,
+        numberField: null as any
       })
-      
+
       expect(model.stringField).toBeNull()
       expect(model.numberField).toBeNull()
-      // Other fields should still get defaults
-      expect(model.booleanField).toBe(true)
+      // Other fields remain undefined
+      expect(model.booleanField).toBeUndefined()
     })
-    
+
     it('should not override falsy values with defaults', () => {
       const model = new TestModelWithDefaults({
         stringField: '',
@@ -150,77 +148,78 @@ describe('SearchModel Defaults', () => {
         booleanField: false,
         stringArrayField: []
       })
-      
+
       expect(model.stringField).toBe('')
       expect(model.numberField).toBe(0)
       expect(model.booleanField).toBe(false)
       expect([...model.stringArrayField]).toEqual([])
     })
-    
-    it('should handle partial defaults correctly', () => {
+
+    it('should leave fields undefined when no values provided', () => {
       const model = new TestModelPartialDefaults()
-      
-      expect(model.withDefault).toBe('has-default')
-      expect(model.numberWithDefault).toBe(100)
+
+      // All fields undefined - no defaults applied in constructor
+      expect(model.withDefault).toBeUndefined()
+      expect(model.numberWithDefault).toBeUndefined()
       expect(model.withoutDefault).toBeUndefined()
       expect(model.numberWithoutDefault).toBeUndefined()
     })
-    
-    it('should apply defaults before validation for required fields', () => {
-      // Should not throw because default is applied
+
+    it('should preserve provided values without applying other defaults', () => {
       const model = new TestModelRequiredWithDefaults({
         requiredWithoutDefault: 'provided-value'
       })
-      
-      expect(model.requiredWithDefault).toBe('required-default')
+
+      // Only provided value is set, default not applied in constructor
+      expect(model.requiredWithDefault).toBeUndefined()
       expect(model.requiredWithoutDefault).toBe('provided-value')
     })
   })
   
-  describe('fromJSON Defaults', () => {
-    it('should apply defaults when loading from JSON', () => {
+  describe('fromJSON Behavior (No Defaults)', () => {
+    it('should NOT apply defaults when loading from JSON', () => {
       const model = TestModelWithDefaults.fromJSON({})
-      
-      expect(model.stringField).toBe('default-string')
-      expect(model.numberField).toBe(42)
-      expect(model.dateField).toEqual(new Date('2023-01-01'))
-      expect(model.booleanField).toBe(true)
-      expect([...model.stringArrayField]).toEqual(['item1', 'item2'])
-      expect(model.keywordField).toBe('default-keyword')
-      expect(model.stringMapField).toEqual({ key1: 'value1', key2: 'value2' })
-      expect(model.objectField).toEqual({ nested: 'default-nested' })
-      expect([...model.objectArrayField]).toEqual([
-        { item: 'default-item1' },
-        { item: 'default-item2' }
-      ])
+
+      // Defaults are NOT applied in fromJSON
+      expect(model.stringField).toBeUndefined()
+      expect(model.numberField).toBeUndefined()
+      expect(model.dateField).toBeUndefined()
+      expect(model.booleanField).toBeUndefined()
+      expect(model.stringArrayField).toBeUndefined()
+      expect(model.keywordField).toBeUndefined()
+      expect(model.stringMapField).toBeUndefined()
+      expect(model.objectField).toBeUndefined()
+      expect(model.objectArrayField).toBeUndefined()
     })
-    
-    it('should apply defaults to missing fields when loading partial data', () => {
+
+    it('should preserve provided values without applying defaults to missing fields', () => {
       const model = TestModelWithDefaults.fromJSON({
         id: id(),
         version: 2,
         stringField: 'from-database'
       })
-      
+
       expect(model.stringField).toBe('from-database')
-      expect(model.numberField).toBe(42) // Should get default
-      expect(model.booleanField).toBe(true) // Should get default
-      expect(model.keywordField).toBe('default-keyword') // Should get default
+      // Missing fields remain undefined - no defaults applied
+      expect(model.numberField).toBeUndefined()
+      expect(model.booleanField).toBeUndefined()
+      expect(model.keywordField).toBeUndefined()
     })
-    
-    it('should not override null values from database', () => {
+
+    it('should preserve null values from database', () => {
       const model = TestModelWithDefaults.fromJSON({
         id: id(),
         version: 2,
-        stringField: null,
-        numberField: null
+        stringField: null as any,
+        numberField: null as any
       })
-      
+
       expect(model.stringField).toBeNull()
       expect(model.numberField).toBeNull()
-      expect(model.booleanField).toBe(true) // Should get default
+      // Other fields remain undefined
+      expect(model.booleanField).toBeUndefined()
     })
-    
+
     it('should handle falsy values from database correctly', () => {
       const model = TestModelWithDefaults.fromJSON({
         id: id(),
@@ -230,14 +229,14 @@ describe('SearchModel Defaults', () => {
         booleanField: false,
         stringArrayField: []
       })
-      
+
       expect(model.stringField).toBe('')
       expect(model.numberField).toBe(0)
       expect(model.booleanField).toBe(false)
       expect([...model.stringArrayField]).toEqual([])
     })
-    
-    it('should simulate loading old records with new fields', () => {
+
+    it('should load old records without applying defaults to new fields', () => {
       // Simulate an old record that doesn't have the new fields
       const oldRecord = {
         id: id(),
@@ -248,40 +247,48 @@ describe('SearchModel Defaults', () => {
         stringField: 'existing-value'
         // Missing: numberField, booleanField, etc.
       }
-      
-      const model = TestModelWithDefaults.fromJSON(oldRecord)
-      
+
+      const model = TestModelWithDefaults.fromJSON(oldRecord as any)
+
       // Existing fields should be preserved
       expect(model.stringField).toBe('existing-value')
       expect(model.version).toBe(5)
-      
-      // New fields should get defaults
-      expect(model.numberField).toBe(42)
-      expect(model.booleanField).toBe(true)
-      expect(model.keywordField).toBe('default-keyword')
-      expect([...model.stringArrayField]).toEqual(['item1', 'item2'])
+
+      // New fields remain undefined - defaults applied only during save
+      expect(model.numberField).toBeUndefined()
+      expect(model.booleanField).toBeUndefined()
+      expect(model.keywordField).toBeUndefined()
+      expect(model.stringArrayField).toBeUndefined()
     })
   })
   
-  describe('Default Function Isolation', () => {
-    it('should create new instances from default functions', () => {
-      const model1 = new TestModelWithDefaults()
-      const model2 = new TestModelWithDefaults()
-      
+  describe('Constructor Field Independence', () => {
+    it('should create independent instances without shared state', () => {
+      // Set values explicitly since defaults aren't applied in constructor
+      const model1 = new TestModelWithDefaults({
+        stringArrayField: ['item1', 'item2'],
+        stringMapField: { key1: 'value1', key2: 'value2' },
+        objectField: { nested: 'original' },
+        objectArrayField: [{ item: 'item1' }]
+      })
+      const model2 = new TestModelWithDefaults({
+        stringArrayField: ['item1', 'item2'],
+        stringMapField: { key1: 'value1', key2: 'value2' },
+        objectField: { nested: 'original' },
+        objectArrayField: [{ item: 'item1' }]
+      })
+
       // Modify arrays and objects in model1
-      model1.stringArrayField.push('item3')
-      model1.stringMapField.key3 = 'value3'
-      model1.objectField.nested = 'modified'
-      model1.objectArrayField.push({ item: 'new-item' })
-      
-      // model2 should have pristine defaults
+      model1.stringArrayField = [...model1.stringArrayField, 'item3']
+      model1.stringMapField = { ...model1.stringMapField, key3: 'value3' }
+      model1.objectField = { nested: 'modified' }
+      model1.objectArrayField = [...model1.objectArrayField, { item: 'new-item' }]
+
+      // model2 should be unaffected
       expect([...model2.stringArrayField]).toEqual(['item1', 'item2'])
       expect(model2.stringMapField).toEqual({ key1: 'value1', key2: 'value2' })
-      expect(model2.objectField).toEqual({ nested: 'default-nested' })
-      expect([...model2.objectArrayField]).toEqual([
-        { item: 'default-item1' },
-        { item: 'default-item2' }
-      ])
+      expect(model2.objectField).toEqual({ nested: 'original' })
+      expect([...model2.objectArrayField]).toEqual([{ item: 'item1' }])
     })
   })
   

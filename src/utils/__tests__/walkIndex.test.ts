@@ -6,7 +6,7 @@ import { walkIndex } from '../walkIndex'
 
 const testIndexName = `walk_index_test_${id()}`
 
-class WalkIndexTestModel extends SearchModel {
+class WalkIndexTestModel extends SearchModel<WalkIndexTestModel> {
   static readonly indexName = testIndexName
 
   @StringType({ required: true })
@@ -18,12 +18,13 @@ class WalkIndexTestModel extends SearchModel {
 
 describe('walkIndex', () => {
   beforeAll(async () => {
-    await WalkIndexTestModel.createIndex()
+    await (WalkIndexTestModel as any).createIndex()
   })
 
   afterAll(async () => {
     try {
-      await WalkIndexTestModel.deleteIndex()
+      const { search } = await import('../../core/SearchService')
+      await search.searchRequest('DELETE', `/${testIndexName}`)
     } catch (err) {
       // Ignore errors on cleanup
     }
@@ -47,7 +48,7 @@ describe('walkIndex', () => {
     const touched = new Set<string>()
 
     // Walk through all documents
-    await walkIndex(WalkIndexTestModel, ['*'], async (instance) => {
+    await walkIndex(WalkIndexTestModel as any, ['*'], async (instance: WalkIndexTestModel) => {
       if (instance.name.startsWith('test1-doc-')) {
         touched.add(instance.id)
       }
@@ -82,9 +83,9 @@ describe('walkIndex', () => {
     const touched = new Set<string>()
 
     await walkIndex(
-      WalkIndexTestModel,
+      WalkIndexTestModel as any,
       ['*'],
-      async (instance) => {
+      async (instance: WalkIndexTestModel) => {
         if (instance.name.startsWith('test2-concurrency-')) {
           currentlyRunning++
           maxConcurrent = Math.max(maxConcurrent, currentlyRunning)
@@ -111,17 +112,17 @@ describe('walkIndex', () => {
     // Create a new model class with a new index
     const freshIndexName = `walk_index_fresh_${id()}`
 
-    class FreshTestModel extends SearchModel {
+    class FreshTestModel extends SearchModel<FreshTestModel> {
       static readonly indexName = freshIndexName
 
       @StringType({ required: true })
       name!: string
     }
 
-    await FreshTestModel.createIndex()
+    await (FreshTestModel as any).createIndex()
 
     const touched: string[] = []
-    await walkIndex(FreshTestModel, ['*'], async (instance) => {
+    await walkIndex(FreshTestModel as any, ['*'], async (instance: FreshTestModel) => {
       touched.push(instance.id)
     })
 
@@ -143,7 +144,7 @@ describe('walkIndex', () => {
     await new Promise((resolve) => setTimeout(resolve, 2000))
 
     // Modify each document during walk
-    await walkIndex(WalkIndexTestModel, ['*'], async (instance) => {
+    await walkIndex(WalkIndexTestModel as any, ['*'], async (instance: WalkIndexTestModel) => {
       if (instance.name.startsWith('test4-modify-')) {
         instance.value = instance.value * 2
         await instance.save()

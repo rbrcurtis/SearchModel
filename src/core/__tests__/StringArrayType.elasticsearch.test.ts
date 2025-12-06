@@ -4,7 +4,7 @@ import { StringArrayType } from '../../decorators'
 import { id } from '../../utils/id'
 
 // Test model with string array field
-class StringArrayTestModel extends SearchModel {
+class StringArrayTestModel extends SearchModel<StringArrayTestModel> {
   static readonly indexName = `search_model_tests_${id()}`
 
   @StringArrayType({ required: true })

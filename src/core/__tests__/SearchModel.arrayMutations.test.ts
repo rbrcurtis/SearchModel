@@ -7,7 +7,7 @@ import {
 } from '../../index'
 
 // Test model with array fields
-class TestModel extends SearchModel {
+class TestModel extends SearchModel<TestModel> {
   static readonly indexName = 'test-array-mutations'
 
   @StringType({ required: true })

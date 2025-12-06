@@ -4,7 +4,7 @@ import { StringType, NumberType } from '../../decorators'
 import { id } from '../../utils/id'
 
 // Test model with afterSave hook
-class AfterSaveTestModel extends SearchModel {
+class AfterSaveTestModel extends SearchModel<AfterSaveTestModel> {
   static readonly indexName = `after_save_tests_${id()}`
 
   @StringType({ required: true })

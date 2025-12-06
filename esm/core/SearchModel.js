@@ -59,7 +59,6 @@ export class SearchModel {
             ;
             this[key] = value;
         }
-        this.applyDefaults();
         if (data?.id && data?.version) {
             this._isNewDocument = false;
         }

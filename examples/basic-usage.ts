@@ -10,7 +10,7 @@ import {
 } from '../src'
 
 // Define a User model
-class User extends SearchModel {
+class User extends SearchModel<User> {
   static readonly indexName = 'example_users'
   
   @StringType({ 

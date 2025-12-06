@@ -1,3 +1,4 @@
+import { Mock } from 'vitest'
 import { createTrackedArray } from '../arrayProxy'
 
 describe('createTrackedArray', () => {

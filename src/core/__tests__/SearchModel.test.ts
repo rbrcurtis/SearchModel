@@ -1,4 +1,5 @@
 import 'reflect-metadata'
+import { Mocked } from 'vitest'
 import { SearchModel } from '../SearchModel'
 import { StringType, NumberType, DateType, BooleanType } from '../../decorators'
 import { search, SearchError, VersionConflictError } from '../SearchService'
@@ -21,7 +22,7 @@ vi.mock('../SearchService', async () => {
 const mockedSearch = search as Mocked<typeof search>
 
 // Test model class
-class TestModel extends SearchModel {
+class TestModel extends SearchModel<TestModel> {
   static readonly indexName = 'test-index'
   
   @StringType({ required: true })
@@ -38,7 +39,7 @@ class TestModel extends SearchModel {
 }
 
 // Test model with lifecycle hooks
-class ModelWithHooks extends SearchModel {
+class ModelWithHooks extends SearchModel<ModelWithHooks> {
   static readonly indexName = 'hooks-index'
   
   @StringType()
@@ -77,12 +78,13 @@ describe('SearchModel', () => {
   })
 
   describe('constructor', () => {
-    it('should initialize with default values', () => {
+    it('should not apply defaults in constructor (applied during save)', () => {
       const model = new TestModel()
-      expect(model.id).toBeDefined()
-      expect(model.createdAt).toBeInstanceOf(Date)
-      expect(model.updatedAt).toBeInstanceOf(Date)
-      expect(model.version).toBe(1)
+      // Defaults are not applied in constructor - they're applied during save
+      expect(model.id).toBeUndefined()
+      expect(model.createdAt).toBeUndefined()
+      expect(model.updatedAt).toBeUndefined()
+      expect(model.version).toBeUndefined()
     })
 
     it('should initialize with provided values', () => {
@@ -108,8 +110,8 @@ describe('SearchModel', () => {
     it('should parse date strings', () => {
       const dateString = '2023-01-01T00:00:00.000Z'
       const model = new TestModel({
-        createdAt: dateString,
-        updatedAt: dateString
+        createdAt: dateString as any,
+        updatedAt: dateString as any
       })
 
       expect(model.createdAt).toBeInstanceOf(Date)
@@ -122,7 +124,7 @@ describe('SearchModel', () => {
       const model = new TestModel({
         id: id(),
         name: 'Test User',
-        birthDate: dateString, // This should be converted to Date automatically
+        birthDate: dateString as any, // This should be converted to Date automatically
         version: 1
       })
 
@@ -139,9 +141,9 @@ describe('SearchModel', () => {
       const model = new TestModel({
         id: id(),
         name: 'Test User',
-        createdAt: createdAtString,
-        updatedAt: updatedAtString,
-        birthDate: birthDateString,
+        createdAt: createdAtString as any,
+        updatedAt: updatedAtString as any,
+        birthDate: birthDateString as any,
         version: 5
       })
 
@@ -267,10 +269,10 @@ describe('SearchModel', () => {
     })
 
     it('should throw error when indexName is not defined', async () => {
-      class NoIndexModel extends SearchModel {
+      class NoIndexModel extends SearchModel<NoIndexModel> {
         // No indexName defined
       }
-      
+
       await expect(SearchModel.createIndex.call(NoIndexModel as any))
         .rejects.toThrow('IndexName not defined for NoIndexModel')
     })
@@ -406,10 +408,10 @@ describe('SearchModel', () => {
     })
 
     it('should throw error when indexName is not defined', async () => {
-      class NoIndexModel extends SearchModel {
+      class NoIndexModel extends SearchModel<NoIndexModel> {
         // No indexName defined
       }
-      
+
       const model = new NoIndexModel({ id: id() })
       await expect(model.delete()).rejects.toThrow('IndexName not defined')
     })

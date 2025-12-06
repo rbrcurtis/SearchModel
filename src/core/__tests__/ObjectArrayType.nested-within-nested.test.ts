@@ -3,7 +3,7 @@ import { ObjectArrayType } from '../../decorators'
 
 describe('ObjectArrayType - nested within nested arrays', () => {
   // Test model with objectArray containing another objectArray
-  class TestModelNestedArrays extends SearchModel {
+  class TestModelNestedArrays extends SearchModel<TestModelNestedArrays> {
     static readonly indexName = 'test-nested-arrays'
 
     @ObjectArrayType({
@@ -29,7 +29,7 @@ describe('ObjectArrayType - nested within nested arrays', () => {
   }
 
   // Test model with nested: true on outer array but default on inner
-  class TestModelNestedOuter extends SearchModel {
+  class TestModelNestedOuter extends SearchModel<TestModelNestedOuter> {
     static readonly indexName = 'test-nested-outer'
 
     @ObjectArrayType({
@@ -54,7 +54,7 @@ describe('ObjectArrayType - nested within nested arrays', () => {
   }
 
   // Test model with nested: true on inner array but default on outer
-  class TestModelNestedInner extends SearchModel {
+  class TestModelNestedInner extends SearchModel<TestModelNestedInner> {
     static readonly indexName = 'test-nested-inner'
 
     @ObjectArrayType({

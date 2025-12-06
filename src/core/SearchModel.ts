@@ -127,9 +127,6 @@ export abstract class SearchModel<T extends SearchModel<T>> {
       ;(this as any)[key] = value
     }
 
-    // Apply defaults to any undefined fields
-    this.applyDefaults()
-
     // If we have data with an id and version, this is an existing document
     if ((data as any)?.id && (data as any)?.version) {
       this._isNewDocument = false

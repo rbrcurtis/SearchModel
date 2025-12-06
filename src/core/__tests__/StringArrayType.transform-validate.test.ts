@@ -6,7 +6,7 @@ import { id } from '../../utils/id'
 // Test model with validate option
 // Note: transform is defined in the interface but not currently implemented in decorators
 // So we validate already-normalized domains (lowercase, no spaces)
-class DomainTestModel extends SearchModel {
+class DomainTestModel extends SearchModel<DomainTestModel> {
   static readonly indexName = `search_model_tests_${id()}`
 
   @StringArrayType({

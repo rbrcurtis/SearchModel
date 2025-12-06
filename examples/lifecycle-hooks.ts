@@ -10,7 +10,7 @@ import {
 } from '../src'
 
 // Example model with lifecycle hooks
-class BlogPost extends SearchModel {
+class BlogPost extends SearchModel<BlogPost> {
   static readonly indexName = 'example_blog_posts'
   
   @StringType({ required: true })
@@ -35,7 +35,7 @@ class BlogPost extends SearchModel {
   status!: 'draft' | 'published' | 'archived'
   
   // Lifecycle hooks
-  protected async beforeSave(event: SaveEvent): Promise<void> {
+  protected async beforeSave(event: SaveEvent): Promise<boolean> {
     console.log('🔄 beforeSave hook triggered')
     console.log('  Changed fields:', event.updated)
     
@@ -59,8 +59,10 @@ class BlogPost extends SearchModel {
       this.tags = this.tags.map(tag => tag.toLowerCase().trim()).filter(tag => tag.length > 0)
       console.log('  Normalized tags:', this.tags)
     }
+
+    return true
   }
-  
+
   protected async afterSave(event: SaveEvent): Promise<void> {
     console.log('✅ afterSave hook triggered')
     console.log('  Document saved with ID:', this.id)

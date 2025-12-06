@@ -4,7 +4,7 @@ import { StringArrayType } from '../index'
 import { id } from '../../utils/id'
 
 // Test model with stringArray fields
-class TestStringArrayModel extends SearchModel {
+class TestStringArrayModel extends SearchModel<TestStringArrayModel> {
   static readonly indexName = 'test-stringarray-index'
 
   @StringArrayType({ required: true })
@@ -110,7 +110,7 @@ describe('StringArrayType Persistence', () => {
       expect(typeof searchDoc.requiredTags[2]).toBe('string')
     })
 
-    it('should handle default values in toSearch', () => {
+    it('should NOT have default values in toSearch (defaults applied during save)', () => {
       const testId = id()
       const model = new TestStringArrayModel({
         id: testId,
@@ -119,8 +119,8 @@ describe('StringArrayType Persistence', () => {
 
       const searchDoc = model.toSearch()
 
-      expect(searchDoc.defaultValues).toEqual(['default1', 'default2'])
-      expect(Array.isArray(searchDoc.defaultValues)).toBe(true)
+      // Defaults are NOT applied in constructor - they're applied during save
+      expect(searchDoc.defaultValues).toBeUndefined()
     })
 
     it('should return correct values in toSearch after setting string arrays post-creation', () => {
@@ -349,13 +349,13 @@ describe('StringArrayType Persistence', () => {
       expect(model.id).toBe(testId)
     })
 
-    it('should apply default values for stringArray fields', () => {
+    it('should NOT apply default values in constructor (applied during save)', () => {
       const model = new TestStringArrayModel({
         requiredTags: ['tag1']
       })
 
-      // Default values should be applied
-      expect([...model.defaultValues]).toEqual(['default1', 'default2'])
+      // Default values are NOT applied in constructor
+      expect(model.defaultValues).toBeUndefined()
     })
 
     it('should handle undefined and null values correctly', () => {

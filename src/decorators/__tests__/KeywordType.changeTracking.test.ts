@@ -4,7 +4,7 @@ import { KeywordType } from '../index'
 import { id } from '../../utils/id'
 
 // Test model with keyword field
-class TestKeywordModel extends SearchModel {
+class TestKeywordModel extends SearchModel<TestKeywordModel> {
   static readonly indexName = 'test-keyword-index'
 
   @KeywordType({ required: true })

@@ -4,7 +4,7 @@ import { StringType, NumberType, DateType, BooleanType, StringArrayType } from '
 import { id } from '../../utils/id'
 
 // Test model class with various field types
-class UpdateTestModel extends SearchModel {
+class UpdateTestModel extends SearchModel<UpdateTestModel> {
   static readonly indexName = 'update-test-index'
 
   @StringType({ required: true })

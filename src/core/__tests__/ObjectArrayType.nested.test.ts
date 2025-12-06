@@ -3,7 +3,7 @@ import { ObjectArrayType } from '../../decorators'
 
 describe('ObjectArrayType nested option', () => {
   // Test model with default (no nested option)
-  class TestModelDefault extends SearchModel {
+  class TestModelDefault extends SearchModel<TestModelDefault> {
     static readonly indexName = 'test-default'
 
     @ObjectArrayType({
@@ -16,7 +16,7 @@ describe('ObjectArrayType nested option', () => {
   }
 
   // Test model with nested: true
-  class TestModelNested extends SearchModel {
+  class TestModelNested extends SearchModel<TestModelNested> {
     static readonly indexName = 'test-nested'
 
     @ObjectArrayType({
@@ -30,7 +30,7 @@ describe('ObjectArrayType nested option', () => {
   }
 
   // Test model with nested: false (explicit)
-  class TestModelNotNested extends SearchModel {
+  class TestModelNotNested extends SearchModel<TestModelNotNested> {
     static readonly indexName = 'test-not-nested'
 
     @ObjectArrayType({
