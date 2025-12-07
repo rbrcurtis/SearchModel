@@ -41,7 +41,7 @@ export function validateFieldType(value, type, propertyKey, options) {
             break;
         case 'number':
             if (typeof value !== 'number' || isNaN(value)) {
-                throw new Error(`Field '${propertyKey}' must be a valid number, got ${typeof value}`);
+                throw new Error(`Field '${propertyKey}' must be a valid number, got ${typeof value} (${value})`);
             }
             break;
         case 'boolean':
@@ -102,7 +102,7 @@ function getPrivateStorage(instance) {
             value: {},
             writable: false,
             enumerable: false,
-            configurable: false
+            configurable: false,
         });
     }
     return instance[PRIVATE_STORAGE];
@@ -112,7 +112,9 @@ function createValidatedProperty(target, propertyKey, type, options) {
         get: function () {
             const storage = getPrivateStorage(this);
             const value = storage[propertyKey];
-            if (value && Array.isArray(value) && (type === 'stringArray' || type === 'objectArray')) {
+            if (value &&
+                Array.isArray(value) &&
+                (type === 'stringArray' || type === 'objectArray')) {
                 if (!value.__isTrackedArray) {
                     const trackedArray = createTrackedArray(value, () => {
                         if (this.markFieldChanged) {
@@ -139,7 +141,8 @@ function createValidatedProperty(target, propertyKey, type, options) {
                 if (options.validate && !options.validate(value)) {
                     throw new Error(`Field '${propertyKey}' failed custom validation`);
                 }
-                if (Array.isArray(value) && (type === 'stringArray' || type === 'objectArray')) {
+                if (Array.isArray(value) &&
+                    (type === 'stringArray' || type === 'objectArray')) {
                     const trackedArray = createTrackedArray(value, () => {
                         if (this.markFieldChanged) {
                             this.markFieldChanged(propertyKey);

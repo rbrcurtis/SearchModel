@@ -169,7 +169,7 @@ export function validateFieldType(
     case 'number':
       if (typeof value !== 'number' || isNaN(value)) {
         throw new Error(
-          `Field '${propertyKey}' must be a valid number, got ${typeof value}`
+          `Field '${propertyKey}' must be a valid number, got ${typeof value} (${value})`
         )
       }
       break
@@ -254,7 +254,7 @@ function getPrivateStorage(instance: any): Record<string, any> {
       value: {},
       writable: false,
       enumerable: false,
-      configurable: false
+      configurable: false,
     })
   }
   return instance[PRIVATE_STORAGE]
@@ -273,7 +273,11 @@ function createValidatedProperty(
       const value = storage[propertyKey]
 
       // Wrap arrays with proxy for mutation tracking
-      if (value && Array.isArray(value) && (type === 'stringArray' || type === 'objectArray')) {
+      if (
+        value &&
+        Array.isArray(value) &&
+        (type === 'stringArray' || type === 'objectArray')
+      ) {
         // Only wrap if not already wrapped
         if (!(value as any).__isTrackedArray) {
           const trackedArray = createTrackedArray(value, () => {
@@ -310,7 +314,10 @@ function createValidatedProperty(
         }
 
         // Wrap arrays with proxy for mutation tracking
-        if (Array.isArray(value) && (type === 'stringArray' || type === 'objectArray')) {
+        if (
+          Array.isArray(value) &&
+          (type === 'stringArray' || type === 'objectArray')
+        ) {
           const trackedArray = createTrackedArray(value, () => {
             if (this.markFieldChanged) {
               this.markFieldChanged(propertyKey)
