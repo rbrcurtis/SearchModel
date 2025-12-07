@@ -293,6 +293,14 @@ function createValidatedProperty(
       const oldValue = storage[propertyKey]
 
       if (value !== undefined && value !== null) {
+        // Coerce numeric strings to numbers for number fields
+        if (type === 'number' && typeof value === 'string') {
+          const num = Number(value)
+          if (!isNaN(num)) {
+            value = num
+          }
+        }
+
         // Type validation
         validateFieldType(value, type, propertyKey, options)
 
