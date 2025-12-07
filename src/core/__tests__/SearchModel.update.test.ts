@@ -1,6 +1,12 @@
 import 'reflect-metadata'
 import { SearchModel } from '../SearchModel'
-import { StringType, NumberType, DateType, BooleanType, StringArrayType } from '../../decorators'
+import {
+  StringType,
+  NumberType,
+  DateType,
+  BooleanType,
+  StringArrayType,
+} from '../../decorators'
 import { id } from '../../utils/id'
 
 // Test model class with various field types
@@ -43,7 +49,7 @@ describe('SearchModel.update()', () => {
         id: testId,
         name: 'Original',
         score: 50,
-        isActive: false
+        isActive: false,
       })
       model['clearChangedFields']()
 
@@ -51,7 +57,7 @@ describe('SearchModel.update()', () => {
         name: 'Updated Name',
         score: 100,
         isActive: true,
-        description: 'New description'
+        description: 'New description',
       })
 
       expect(model.name).toBe('Updated Name')
@@ -70,7 +76,7 @@ describe('SearchModel.update()', () => {
         score: 85,
         birthDate: updateDate,
         isActive: true,
-        tags: ['tag1', 'tag2', 'tag3']
+        tags: ['tag1', 'tag2', 'tag3'],
       })
 
       expect(model.name).toBe('Test')
@@ -95,7 +101,7 @@ describe('SearchModel.update()', () => {
 
       model.update({
         name: 'Updated',
-        score: 100
+        score: 100,
       })
 
       const changedFields = model['getChangedFields']()
@@ -123,7 +129,7 @@ describe('SearchModel.update()', () => {
         name: 'Test Name',
         score: 95,
         isActive: true,
-        tags: ['new', 'tags']
+        tags: ['new', 'tags'],
       })
 
       const changedFields = model['getChangedFields']()
@@ -139,13 +145,13 @@ describe('SearchModel.update()', () => {
       const model = new UpdateTestModel({
         id: testId,
         name: 'Unchanged',
-        score: 50
+        score: 50,
       })
       model['clearChangedFields']()
 
       model.update({
         name: 'Unchanged',
-        score: 50
+        score: 50,
       })
 
       const changedFields = model['getChangedFields']()
@@ -156,14 +162,14 @@ describe('SearchModel.update()', () => {
       const model = new UpdateTestModel({
         name: 'Original',
         score: 50,
-        isActive: false
+        isActive: false,
       })
       model['clearChangedFields']()
 
       model.update({
         name: 'Updated', // changed
-        score: 50,      // same
-        isActive: true  // changed
+        score: 50, // same
+        isActive: true, // changed
       })
 
       const changedFields = model['getChangedFields']()
@@ -179,7 +185,7 @@ describe('SearchModel.update()', () => {
 
       model.update({
         score: 100,
-        description: 'New description'
+        description: 'New description',
       })
 
       const changedFields = model['getChangedFields']()
@@ -191,12 +197,12 @@ describe('SearchModel.update()', () => {
     it('should track changes when updating to null/undefined', () => {
       const model = new UpdateTestModel({
         name: 'Test',
-        description: 'Original'
+        description: 'Original',
       })
       model['clearChangedFields']()
 
       model.update({
-        description: undefined
+        description: undefined,
       })
 
       const changedFields = model['getChangedFields']()
@@ -213,7 +219,7 @@ describe('SearchModel.update()', () => {
       model.update({
         name: 'Updated',
         invalidField: 'should be ignored',
-        anotherInvalid: 123
+        anotherInvalid: 123,
       })
 
       expect(model.name).toBe('Updated')
@@ -233,7 +239,7 @@ describe('SearchModel.update()', () => {
           name: 'Valid',
           nonExistentProp: 'ignored',
           anotherFake: { nested: 'object' },
-          yetAnother: [1, 2, 3]
+          yetAnother: [1, 2, 3],
         })
       }).not.toThrow()
 
@@ -258,7 +264,7 @@ describe('SearchModel.update()', () => {
         createdAt: new Date('2020-01-01'), // valid field
         updatedAt: new Date('2020-01-01'), // valid field
         fakeField: 'ignored',
-        anotherFake: 123
+        anotherFake: 123,
       })
 
       expect(model.name).toBe('Test Name')
@@ -276,7 +282,7 @@ describe('SearchModel.update()', () => {
 
       expect(() => {
         model.update({
-          name: 123 // Should fail string validation
+          name: 123, // Should fail string validation
         })
       }).toThrow("Field 'name' must be a string, got number")
     })
@@ -287,9 +293,11 @@ describe('SearchModel.update()', () => {
       expect(() => {
         model.update({
           name: 'Valid',
-          score: 'invalid number' // Should fail number validation
+          score: 'invalid number', // Should fail number validation
         })
-      }).toThrow("Field 'score' must be a valid number, got string")
+      }).toThrow(
+        "Field 'score' must be a valid number, got string (invalid number)"
+      )
     })
 
     it('should validate array fields correctly', () => {
@@ -297,7 +305,7 @@ describe('SearchModel.update()', () => {
 
       expect(() => {
         model.update({
-          tags: 'not an array' // Should fail array validation
+          tags: 'not an array', // Should fail array validation
         })
       }).toThrow("Field 'tags' must be an array, got string")
     })
@@ -307,7 +315,7 @@ describe('SearchModel.update()', () => {
 
       expect(() => {
         model.update({
-          birthDate: 'invalid date string'
+          birthDate: 'invalid date string',
         })
       }).toThrow("Field 'birthDate' must be a valid date string")
     })
@@ -320,7 +328,7 @@ describe('SearchModel.update()', () => {
         model.update({
           name: 'Updated', // This should be set before error
           score: 'invalid', // This should cause error
-          isActive: true   // This should not be set due to error
+          isActive: true, // This should not be set due to error
         })
       }).toThrow()
 
@@ -349,9 +357,7 @@ describe('SearchModel.update()', () => {
     it('should work with chaining and other methods', () => {
       const model = new UpdateTestModel()
 
-      const result = model
-        .update({ name: 'Test' })
-        .update({ score: 100 })
+      const result = model.update({ name: 'Test' }).update({ score: 100 })
 
       expect(result).toBe(model)
       expect(model.name).toBe('Test')
@@ -377,13 +383,13 @@ describe('SearchModel.update()', () => {
       const testId = id()
       const model = new UpdateTestModel({
         id: testId,
-        name: 'Original'
+        name: 'Original',
       })
 
       model.update({
         name: 'Updated',
         score: 85,
-        isActive: true
+        isActive: true,
       })
 
       const json = model.toJSON()
@@ -391,7 +397,7 @@ describe('SearchModel.update()', () => {
         id: testId,
         name: 'Updated',
         score: 85,
-        isActive: true
+        isActive: true,
       })
     })
   })
@@ -420,7 +426,7 @@ describe('SearchModel.update()', () => {
     it('should handle undefined values', () => {
       const model = new UpdateTestModel({
         name: 'Original',
-        description: 'Has description'
+        description: 'Has description',
       })
       model['clearChangedFields']()
 
@@ -439,7 +445,7 @@ describe('SearchModel.update()', () => {
 
       model.update({
         birthDate: complexDate,
-        tags: complexArray
+        tags: complexArray,
       })
 
       expect(model.birthDate).toEqual(complexDate)
