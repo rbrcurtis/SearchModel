@@ -27,17 +27,17 @@ async function processConcurrently<T>(
   }
 }
 
-export async function walkIndex<T extends typeof SearchModel>(
-  ModelClass: T,
+export async function walkIndex<T extends { id: string }>(
+  ModelClass: (new (data?: Partial<T>) => T) & { indexName: string; fromJSON(data: any): T },
   terms: string[],
-  callback: (hit: InstanceType<T>) => Promise<void>,
+  callback: (hit: T) => Promise<void>,
   options: { concurrency?: number } = {}
 ): Promise<void> {
   const { concurrency = 10 } = options
-  const indexName = (ModelClass as any).indexName
+  const indexName = ModelClass.indexName
   let lastId: string | null = null
   const size = 100
-  const instances: InstanceType<T>[] = []
+  const instances: T[] = []
 
   while (true) {
     const queryTerms = [...terms]
@@ -55,9 +55,9 @@ export async function walkIndex<T extends typeof SearchModel>(
     }
 
     for (const hit of results.hits) {
-      const instance = (ModelClass as any).fromJSON(hit) as InstanceType<T>
+      const instance = ModelClass.fromJSON(hit)
       instances.push(instance)
-      lastId = (instance as any).id
+      lastId = instance.id
     }
 
     if (results.hits.length < size) {
