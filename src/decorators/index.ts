@@ -56,6 +56,7 @@ interface ObjectPropertyDefinition {
     | 'boolean'
     | 'keyword'
     | 'stringMap'
+    | 'geoPoint'
   options?: BaseFieldOptions | StringFieldOptions | ObjectFieldOptions
 }
 
@@ -87,6 +88,7 @@ export interface FieldMetadata {
     | 'boolean'
     | 'keyword'
     | 'stringMap'
+    | 'geoPoint'
   options?: BaseFieldOptions | StringFieldOptions | ObjectFieldOptions
 }
 
@@ -261,6 +263,36 @@ export function validateFieldType(
       if (typeof value !== 'object' || Array.isArray(value)) {
         throw new Error(
           `Field '${propertyKey}' must be an object, got ${Array.isArray(value) ? 'array' : typeof value}`
+        )
+      }
+      break
+    case 'geoPoint':
+      if (value === null) {
+        throw new Error(`Field '${propertyKey}' must be a geo point object, got null`)
+      }
+      if (typeof value !== 'object' || Array.isArray(value)) {
+        throw new Error(
+          `Field '${propertyKey}' must be a geo point object with lat/lon, got ${Array.isArray(value) ? 'array' : typeof value}`
+        )
+      }
+      if (typeof value.lat !== 'number' || isNaN(value.lat)) {
+        throw new Error(
+          `Field '${propertyKey}.lat' must be a valid number`
+        )
+      }
+      if (typeof value.lon !== 'number' || isNaN(value.lon)) {
+        throw new Error(
+          `Field '${propertyKey}.lon' must be a valid number`
+        )
+      }
+      if (value.lat < -90 || value.lat > 90) {
+        throw new Error(
+          `Field '${propertyKey}.lat' must be between -90 and 90`
+        )
+      }
+      if (value.lon < -180 || value.lon > 180) {
+        throw new Error(
+          `Field '${propertyKey}.lon' must be between -180 and 180`
         )
       }
       break
@@ -767,5 +799,48 @@ export function StringMapType(options: BaseFieldOptions = {}) {
       options,
     })
     createValidatedProperty(target, propertyKey, 'stringMap', options)
+  }
+}
+
+/**
+ * Decorator for geographic point fields (latitude/longitude coordinates).
+ * Mapped to Elasticsearch 'geo_point' type for geo-distance queries and spatial filtering.
+ * Use this for location data that needs radius searches or distance-based sorting.
+ *
+ * The value must be an object with `lat` and `lon` properties:
+ * - lat: Latitude (-90 to 90)
+ * - lon: Longitude (-180 to 180)
+ *
+ * @param options - Field configuration options
+ * @param options.required - Field must have a value
+ * @param options.validate - Custom validation function
+ * @param options.default - Factory function for default value
+ *
+ * @example
+ * ```typescript
+ * class MyModel extends SearchModel {
+ *   @GeoPointType()
+ *   location?: { lat: number; lon: number }
+ *
+ *   @GeoPointType({ required: true })
+ *   headquarters!: { lat: number; lon: number }
+ * }
+ *
+ * // Usage:
+ * model.location = { lat: 40.7128, lon: -74.0060 }  // New York City
+ * await model.save()
+ *
+ * // Query with geo_distance:
+ * // { geo_distance: { distance: "50mi", location: { lat: 40.7, lon: -74.0 } } }
+ * ```
+ */
+export function GeoPointType(options: BaseFieldOptions = {}) {
+  return function (target: any, propertyKey: string): void {
+    setFieldMetadata(target, {
+      propertyKey,
+      type: 'geoPoint',
+      options,
+    })
+    createValidatedProperty(target, propertyKey, 'geoPoint', options)
   }
 }

@@ -14,6 +14,7 @@ export {
   ObjectArrayType,
   KeywordType,
   StringMapType,
+  GeoPointType,
   FieldMetadata,
   getFieldMetadata,
   validateFieldType

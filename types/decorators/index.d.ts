@@ -11,7 +11,7 @@ interface StringFieldOptions extends BaseFieldOptions {
     upperCase?: boolean;
 }
 interface ObjectPropertyDefinition {
-    type: 'date' | 'dateOnly' | 'string' | 'number' | 'stringArray' | 'object' | 'objectArray' | 'boolean' | 'keyword' | 'stringMap';
+    type: 'date' | 'dateOnly' | 'string' | 'number' | 'stringArray' | 'object' | 'objectArray' | 'boolean' | 'keyword' | 'stringMap' | 'geoPoint';
     options?: BaseFieldOptions | StringFieldOptions | ObjectFieldOptions;
 }
 interface ObjectFieldOptions extends BaseFieldOptions {
@@ -20,7 +20,7 @@ interface ObjectFieldOptions extends BaseFieldOptions {
 }
 export interface FieldMetadata {
     propertyKey: string;
-    type: 'date' | 'dateOnly' | 'string' | 'number' | 'stringArray' | 'object' | 'objectArray' | 'boolean' | 'keyword' | 'stringMap';
+    type: 'date' | 'dateOnly' | 'string' | 'number' | 'stringArray' | 'object' | 'objectArray' | 'boolean' | 'keyword' | 'stringMap' | 'geoPoint';
     options?: BaseFieldOptions | StringFieldOptions | ObjectFieldOptions;
 }
 export declare function getFieldMetadata(target: any): FieldMetadata[];
@@ -35,4 +35,5 @@ export declare function ObjectType(options: ObjectFieldOptions): (target: any, p
 export declare function ObjectArrayType(options: ObjectFieldOptions): (target: any, propertyKey: string) => void;
 export declare function KeywordType(options?: StringFieldOptions): (target: any, propertyKey: string) => void;
 export declare function StringMapType(options?: BaseFieldOptions): (target: any, propertyKey: string) => void;
+export declare function GeoPointType(options?: BaseFieldOptions): (target: any, propertyKey: string) => void;
 export {};

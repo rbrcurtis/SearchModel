@@ -219,6 +219,8 @@ export abstract class SearchModel<T extends SearchModel<T>> {
         return { type: 'object', enabled: false }
       case 'stringMap':
         return { type: 'text', fields: { keyword: { type: 'keyword' } } }
+      case 'geoPoint':
+        return { type: 'geo_point' }
       default:
         return { type: 'text' }
     }
@@ -680,6 +682,9 @@ export abstract class SearchModel<T extends SearchModel<T>> {
       case 'stringMap':
         // Store as JSON string for Elasticsearch
         return JSON.stringify(value)
+      case 'geoPoint':
+        // Elasticsearch expects { lat: number, lon: number } format
+        return { lat: Number(value.lat), lon: Number(value.lon) }
       default:
         return value
     }

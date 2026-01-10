@@ -130,6 +130,8 @@ export class SearchModel {
                 return { type: 'object', enabled: false };
             case 'stringMap':
                 return { type: 'text', fields: { keyword: { type: 'keyword' } } };
+            case 'geoPoint':
+                return { type: 'geo_point' };
             default:
                 return { type: 'text' };
         }
@@ -424,6 +426,8 @@ export class SearchModel {
                 return Array.isArray(value) ? value : [];
             case 'stringMap':
                 return JSON.stringify(value);
+            case 'geoPoint':
+                return { lat: Number(value.lat), lon: Number(value.lon) };
             default:
                 return value;
         }

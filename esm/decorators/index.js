@@ -107,6 +107,26 @@ export function validateFieldType(value, type, propertyKey, options) {
                 throw new Error(`Field '${propertyKey}' must be an object, got ${Array.isArray(value) ? 'array' : typeof value}`);
             }
             break;
+        case 'geoPoint':
+            if (value === null) {
+                throw new Error(`Field '${propertyKey}' must be a geo point object, got null`);
+            }
+            if (typeof value !== 'object' || Array.isArray(value)) {
+                throw new Error(`Field '${propertyKey}' must be a geo point object with lat/lon, got ${Array.isArray(value) ? 'array' : typeof value}`);
+            }
+            if (typeof value.lat !== 'number' || isNaN(value.lat)) {
+                throw new Error(`Field '${propertyKey}.lat' must be a valid number`);
+            }
+            if (typeof value.lon !== 'number' || isNaN(value.lon)) {
+                throw new Error(`Field '${propertyKey}.lon' must be a valid number`);
+            }
+            if (value.lat < -90 || value.lat > 90) {
+                throw new Error(`Field '${propertyKey}.lat' must be between -90 and 90`);
+            }
+            if (value.lon < -180 || value.lon > 180) {
+                throw new Error(`Field '${propertyKey}.lon' must be between -180 and 180`);
+            }
+            break;
     }
 }
 function getPrivateStorage(instance) {
@@ -276,6 +296,16 @@ export function StringMapType(options = {}) {
             options,
         });
         createValidatedProperty(target, propertyKey, 'stringMap', options);
+    };
+}
+export function GeoPointType(options = {}) {
+    return function (target, propertyKey) {
+        setFieldMetadata(target, {
+            propertyKey,
+            type: 'geoPoint',
+            options,
+        });
+        createValidatedProperty(target, propertyKey, 'geoPoint', options);
     };
 }
 //# sourceMappingURL=index.js.map
