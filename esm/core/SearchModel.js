@@ -105,6 +105,8 @@ export class SearchModel {
                 return { type: 'double' };
             case 'date':
                 return { type: 'date' };
+            case 'dateOnly':
+                return { type: 'date', format: 'strict_date' };
             case 'boolean':
                 return { type: 'boolean' };
             case 'stringArray':
@@ -389,6 +391,11 @@ export class SearchModel {
         switch (type) {
             case 'date':
                 return value instanceof Date ? value.toISOString() : value;
+            case 'dateOnly':
+                if (value instanceof Date) {
+                    return value.toISOString().split('T')[0];
+                }
+                return value;
             case 'string':
             case 'keyword':
                 let stringValue = String(value);

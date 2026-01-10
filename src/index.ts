@@ -5,6 +5,7 @@ export { search, SearchError, VersionConflictError } from './core/SearchService'
 // Decorator exports
 export {
   DateType,
+  DateOnlyType,
   StringType,
   NumberType,
   BooleanType,

@@ -47,6 +47,7 @@ interface StringFieldOptions extends BaseFieldOptions {
 interface ObjectPropertyDefinition {
   type:
     | 'date'
+    | 'dateOnly'
     | 'string'
     | 'number'
     | 'stringArray'
@@ -77,6 +78,7 @@ export interface FieldMetadata {
   propertyKey: string
   type:
     | 'date'
+    | 'dateOnly'
     | 'string'
     | 'number'
     | 'stringArray'
@@ -156,6 +158,25 @@ export function validateFieldType(
       }
       if (typeof value === 'string' && isNaN(Date.parse(value))) {
         throw new Error(`Field '${propertyKey}' must be a valid date string`)
+      }
+      break
+    case 'dateOnly':
+      if (!(value instanceof Date) && typeof value !== 'string') {
+        throw new Error(
+          `Field '${propertyKey}' must be a Date or string, got ${typeof value}`
+        )
+      }
+      if (typeof value === 'string') {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+          throw new Error(
+            `Field '${propertyKey}' must be a valid date string in YYYY-MM-DD format`
+          )
+        }
+        if (isNaN(Date.parse(value))) {
+          throw new Error(
+            `Field '${propertyKey}' must be a valid date string in YYYY-MM-DD format`
+          )
+        }
       }
       break
     case 'string':
@@ -370,6 +391,44 @@ export function DateType(options: BaseFieldOptions = {}) {
       options,
     })
     createValidatedProperty(target, propertyKey, 'date', options)
+  }
+}
+
+/**
+ * Decorator for date-only fields (no time component).
+ * Accepts Date objects or strings in YYYY-MM-DD format.
+ * Stored as date in Elasticsearch with strict_date format.
+ *
+ * When a Date object is provided, only the date portion is stored (time is discarded).
+ *
+ * @param options - Field configuration options
+ * @param options.required - Field must have a value
+ * @param options.validate - Custom validation function
+ * @param options.default - Factory function for default value
+ *
+ * @example
+ * ```typescript
+ * class MyModel extends SearchModel {
+ *   @DateOnlyType({ required: true })
+ *   birthDate!: string
+ *
+ *   @DateOnlyType()
+ *   startDate?: string
+ * }
+ *
+ * // Usage:
+ * model.birthDate = '1990-05-15'  // String format
+ * model.birthDate = new Date()     // Date object (time discarded)
+ * ```
+ */
+export function DateOnlyType(options: BaseFieldOptions = {}) {
+  return function (target: any, propertyKey: string): void {
+    setFieldMetadata(target, {
+      propertyKey,
+      type: 'dateOnly',
+      options,
+    })
+    createValidatedProperty(target, propertyKey, 'dateOnly', options)
   }
 }
 

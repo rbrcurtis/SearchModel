@@ -11,7 +11,7 @@ interface StringFieldOptions extends BaseFieldOptions {
     upperCase?: boolean;
 }
 interface ObjectPropertyDefinition {
-    type: 'date' | 'string' | 'number' | 'stringArray' | 'object' | 'objectArray' | 'boolean' | 'keyword' | 'stringMap';
+    type: 'date' | 'dateOnly' | 'string' | 'number' | 'stringArray' | 'object' | 'objectArray' | 'boolean' | 'keyword' | 'stringMap';
     options?: BaseFieldOptions | StringFieldOptions | ObjectFieldOptions;
 }
 interface ObjectFieldOptions extends BaseFieldOptions {
@@ -20,12 +20,13 @@ interface ObjectFieldOptions extends BaseFieldOptions {
 }
 export interface FieldMetadata {
     propertyKey: string;
-    type: 'date' | 'string' | 'number' | 'stringArray' | 'object' | 'objectArray' | 'boolean' | 'keyword' | 'stringMap';
+    type: 'date' | 'dateOnly' | 'string' | 'number' | 'stringArray' | 'object' | 'objectArray' | 'boolean' | 'keyword' | 'stringMap';
     options?: BaseFieldOptions | StringFieldOptions | ObjectFieldOptions;
 }
 export declare function getFieldMetadata(target: any): FieldMetadata[];
 export declare function validateFieldType(value: any, type: string, propertyKey: string, options?: any): void;
 export declare function DateType(options?: BaseFieldOptions): (target: any, propertyKey: string) => void;
+export declare function DateOnlyType(options?: BaseFieldOptions): (target: any, propertyKey: string) => void;
 export declare function StringType(options?: StringFieldOptions): (target: any, propertyKey: string) => void;
 export declare function NumberType(options?: BaseFieldOptions): (target: any, propertyKey: string) => void;
 export declare function BooleanType(options?: BaseFieldOptions): (target: any, propertyKey: string) => void;

@@ -33,6 +33,19 @@ export function validateFieldType(value, type, propertyKey, options) {
                 throw new Error(`Field '${propertyKey}' must be a valid date string`);
             }
             break;
+        case 'dateOnly':
+            if (!(value instanceof Date) && typeof value !== 'string') {
+                throw new Error(`Field '${propertyKey}' must be a Date or string, got ${typeof value}`);
+            }
+            if (typeof value === 'string') {
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+                    throw new Error(`Field '${propertyKey}' must be a valid date string in YYYY-MM-DD format`);
+                }
+                if (isNaN(Date.parse(value))) {
+                    throw new Error(`Field '${propertyKey}' must be a valid date string in YYYY-MM-DD format`);
+                }
+            }
+            break;
         case 'string':
         case 'keyword':
             if (typeof value !== 'string') {
@@ -173,6 +186,16 @@ export function DateType(options = {}) {
             options,
         });
         createValidatedProperty(target, propertyKey, 'date', options);
+    };
+}
+export function DateOnlyType(options = {}) {
+    return function (target, propertyKey) {
+        setFieldMetadata(target, {
+            propertyKey,
+            type: 'dateOnly',
+            options,
+        });
+        createValidatedProperty(target, propertyKey, 'dateOnly', options);
     };
 }
 export function StringType(options = {}) {
