@@ -358,6 +358,16 @@ function createValidatedProperty(
           }
         }
 
+        // Convert Date objects and ISO timestamp strings to YYYY-MM-DD for dateOnly fields
+        if (type === 'dateOnly') {
+          if (value instanceof Date) {
+            value = value.toISOString().split('T')[0]
+          } else if (typeof value === 'string' && value.includes('T')) {
+            // Convert ISO timestamp strings to date-only format
+            value = value.split('T')[0]
+          }
+        }
+
         // Type validation
         validateFieldType(value, type, propertyKey, options)
 

@@ -397,6 +397,9 @@ export class SearchModel {
                 if (value instanceof Date) {
                     return value.toISOString().split('T')[0];
                 }
+                if (typeof value === 'string' && value.includes('T')) {
+                    return value.split('T')[0];
+                }
                 return value;
             case 'string':
             case 'keyword':

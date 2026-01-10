@@ -653,6 +653,10 @@ export abstract class SearchModel<T extends SearchModel<T>> {
         if (value instanceof Date) {
           return value.toISOString().split('T')[0]
         }
+        // Also handle string values that might have time component
+        if (typeof value === 'string' && value.includes('T')) {
+          return value.split('T')[0]
+        }
         return value
       case 'string':
       case 'keyword':
