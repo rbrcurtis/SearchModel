@@ -121,4 +121,33 @@ describe('SearchModel afterSave Integration', () => {
 
     await model.delete()
   })
+
+  it('should only include actually changed fields when loading from ES and modifying', async () => {
+    const testId = id()
+
+    // Create and save initial document
+    const model = new AfterSaveTestModel({
+      id: testId,
+      name: 'Original Name',
+      count: 10,
+    })
+    await model.save()
+
+    // Load document from Elasticsearch (simulates real-world usage)
+    const loaded = await AfterSaveTestModel.getById(testId)
+    expect(loaded).toBeDefined()
+
+    // Modify only the name field
+    loaded!.name = 'Updated Name'
+    await loaded!.save()
+
+    // Verify only 'name' appears in updated, not 'count' or other fields
+    expect(loaded!.afterSaveEvent).toBeDefined()
+    expect(loaded!.afterSaveEvent!.updated).toContain('name')
+    expect(loaded!.afterSaveEvent!.updated).not.toContain('count')
+    expect(loaded!.afterSaveEvent!.updated).not.toContain('id')
+    expect(loaded!.afterSaveEvent!.updated).not.toContain('createdAt')
+
+    await loaded!.delete()
+  })
 })

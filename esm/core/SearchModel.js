@@ -61,6 +61,7 @@ export class SearchModel {
         }
         if (data?.id && data?.version) {
             this._isNewDocument = false;
+            this._changedFields.clear();
         }
     }
     static fromJSON(properties) {

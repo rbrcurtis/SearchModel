@@ -130,6 +130,8 @@ export abstract class SearchModel<T extends SearchModel<T>> {
     // If we have data with an id and version, this is an existing document
     if ((data as any)?.id && (data as any)?.version) {
       this._isNewDocument = false
+      // Clear change tracking since this is a load, not actual changes
+      this._changedFields.clear()
     }
   }
 
