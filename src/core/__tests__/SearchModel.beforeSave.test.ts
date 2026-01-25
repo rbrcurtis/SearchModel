@@ -160,7 +160,7 @@ describe('SearchModel beforeSave Property Persistence', () => {
 
       expect(mockedSearch.searchRequest).toHaveBeenCalledWith(
         'PUT',
-        `/blog-posts/_doc/${testId}?refresh=wait_for`,
+        `/blog-posts/_doc/${testId}`,
         expect.objectContaining({
           slug: 'hello-world-example',
           readTimeMinutes: 1,
@@ -323,7 +323,7 @@ describe('SearchModel beforeSave Property Persistence', () => {
       // The save should include both manually changed fields and beforeSave changes
       expect(mockedSearch.searchRequest).toHaveBeenCalledWith(
         'PUT',
-        `/blog-posts/_doc/${testId}?refresh=wait_for`,
+        `/blog-posts/_doc/${testId}`,
         expect.objectContaining({
           title: 'Updated Title',
           slug: 'updated-title', // Generated in beforeSave
@@ -371,7 +371,7 @@ describe('SearchModel beforeSave Property Persistence', () => {
       // Verify everything was persisted
       expect(mockedSearch.searchRequest).toHaveBeenCalledWith(
         'PUT',
-        `/blog-posts/_doc/${testId}?refresh=wait_for`,
+        `/blog-posts/_doc/${testId}`,
         expect.objectContaining({
           title: 'PUBLISH Updated Article',
           slug: 'publish-updated-article',

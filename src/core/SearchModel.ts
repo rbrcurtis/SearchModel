@@ -455,8 +455,8 @@ export abstract class SearchModel<T extends SearchModel<T>> {
       throw new Error(`IndexName not defined for ${this.constructor.name}`)
     }
 
-    // Default wait to true
-    const wait = options.wait ?? true
+    // Default wait to false for performance
+    const wait = options.wait ?? false
 
     // Get changed fields before lifecycle hooks
     const changedFields = this.getChangedFields()

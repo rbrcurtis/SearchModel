@@ -289,7 +289,7 @@ export class SearchModel {
         if (!indexName) {
             throw new Error(`IndexName not defined for ${this.constructor.name}`);
         }
-        const wait = options.wait ?? true;
+        const wait = options.wait ?? false;
         const changedFields = this.getChangedFields();
         const saveEvent = { updated: changedFields };
         const canSave = await this.beforeSave(saveEvent);

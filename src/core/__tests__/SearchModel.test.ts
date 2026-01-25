@@ -291,7 +291,7 @@ describe('SearchModel', () => {
       
       expect(search.searchRequest).toHaveBeenCalledWith(
         'PUT',
-        `/test-index/_doc/${testId}?refresh=wait_for`,
+        `/test-index/_doc/${testId}`,
         expect.objectContaining({
           id: testId,
           name: 'Test'
@@ -376,8 +376,8 @@ describe('SearchModel', () => {
       
       mockedSearch.searchRequest.mockClear()
       
-      // Test with wait: true (default)
-      await model.save()
+      // Test with wait: true (explicit)
+      await model.save({ wait: true })
       expect(search.searchRequest).toHaveBeenCalledWith(
         'PUT',
         `/test-index/_doc/${testId}?refresh=wait_for`,
