@@ -55,6 +55,7 @@ export class SearchModel {
                 }
             }
         }
+        delete processedData._model;
         for (const [key, value] of Object.entries(processedData)) {
             ;
             this[key] = value;
@@ -89,6 +90,7 @@ export class SearchModel {
                     SearchModel.getElasticsearchFieldType(field);
             }
         }
+        properties._model = { type: 'keyword' };
         return {
             mappings: {
                 properties,
@@ -465,6 +467,7 @@ export class SearchModel {
                 doc[field.propertyKey] = value;
             }
         }
+        doc._model = this.constructor.name;
         return doc;
     }
 }

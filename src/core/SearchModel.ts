@@ -122,6 +122,9 @@ export abstract class SearchModel<T extends SearchModel<T>> {
       }
     }
 
+    // Remove _model from incoming data - it's auto-set on save, not a real field
+    delete processedData._model
+
     // Set each property individually to trigger setters and store in private storage
     for (const [key, value] of Object.entries(processedData)) {
       ;(this as any)[key] = value
@@ -174,6 +177,9 @@ export abstract class SearchModel<T extends SearchModel<T>> {
           SearchModel.getElasticsearchFieldType(field)
       }
     }
+
+    // Always include _model as a keyword field for cross-index debugging
+    properties._model = { type: 'keyword' }
 
     return {
       mappings: {
@@ -738,6 +744,9 @@ export abstract class SearchModel<T extends SearchModel<T>> {
         doc[field.propertyKey] = value
       }
     }
+
+    // Always include _model with the class name for cross-index debugging
+    doc._model = this.constructor.name
 
     return doc
   }
