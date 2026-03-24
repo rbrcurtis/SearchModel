@@ -71,6 +71,10 @@ export abstract class SearchModel<T extends SearchModel<T>> {
     this._changedFields.clear()
   }
 
+  public isNew(): boolean {
+    return this._isNewDocument
+  }
+
   // Lifecycle hooks - can be overridden by child classes
   protected async beforeSave(event: SaveEvent): Promise<boolean> {
     // Default implementation - does nothing
@@ -549,11 +553,11 @@ export abstract class SearchModel<T extends SearchModel<T>> {
         )
       }
 
-      // Mark as no longer a new document after successful save
-      this._isNewDocument = false
-
-      // Call afterSave lifecycle hook
+      // Call afterSave lifecycle hook before clearing new document flag
       await this.afterSave(saveEvent)
+
+      // Mark as no longer a new document after afterSave has run
+      this._isNewDocument = false
 
       // Clear changed fields after successful save
       this.clearChangedFields()

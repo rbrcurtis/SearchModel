@@ -22,6 +22,9 @@ export class SearchModel {
     clearChangedFields() {
         this._changedFields.clear();
     }
+    isNew() {
+        return this._isNewDocument;
+    }
     async beforeSave(event) {
         return true;
     }
@@ -335,8 +338,8 @@ export class SearchModel {
                 this.version = result._version;
                 debug('search', `[SearchModel.save] Updated version from ES response: ${result._version}`);
             }
-            this._isNewDocument = false;
             await this.afterSave(saveEvent);
+            this._isNewDocument = false;
             this.clearChangedFields();
             debug('search', `[SearchModel.save] Save successful for ${this.constructor.name} (ID: ${this.id})`);
             return this;
