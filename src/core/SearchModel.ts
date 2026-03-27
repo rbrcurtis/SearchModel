@@ -114,6 +114,15 @@ export abstract class SearchModel<T extends SearchModel<T>> {
           processedData[field.propertyKey] = new Date(value)
         }
 
+        // Coerce date-only values to YYYY-MM-DD strings
+        if (field.type === 'dateOnly') {
+          if (value instanceof Date) {
+            processedData[field.propertyKey] = value.toISOString().split('T')[0]
+          } else if (typeof value === 'string' && value.includes('T')) {
+            processedData[field.propertyKey] = value.split('T')[0]
+          }
+        }
+
         // Parse stringMap JSON strings to objects
         if (field.type === 'stringMap' && typeof value === 'string') {
           try {

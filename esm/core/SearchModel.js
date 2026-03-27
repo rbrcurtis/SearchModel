@@ -49,6 +49,14 @@ export class SearchModel {
                 if (field.type === 'date' && typeof value === 'string') {
                     processedData[field.propertyKey] = new Date(value);
                 }
+                if (field.type === 'dateOnly') {
+                    if (value instanceof Date) {
+                        processedData[field.propertyKey] = value.toISOString().split('T')[0];
+                    }
+                    else if (typeof value === 'string' && value.includes('T')) {
+                        processedData[field.propertyKey] = value.split('T')[0];
+                    }
+                }
                 if (field.type === 'stringMap' && typeof value === 'string') {
                     try {
                         processedData[field.propertyKey] = JSON.parse(value);
