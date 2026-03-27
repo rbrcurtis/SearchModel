@@ -5,6 +5,7 @@
   "main": "lib/index.js",
   "module": "esm/index.js",
   "types": "types/index.d.ts",
+  "packageManager": "yarn@1.22.22",
   "scripts": {
     "build": "yarn build:cjs && yarn build:esm && yarn build:types",
     "build:cjs": "tsc -p tsconfig.cjs.json",
