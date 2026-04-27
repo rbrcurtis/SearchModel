@@ -24,7 +24,7 @@ declare class SearchService {
         fromJSON: (data: Partial<T>) => T;
     }), terms: string[], options?: {
         limit?: number;
-        sort?: string;
+        sort?: string | Record<string, unknown>[];
         page?: number;
     }): Promise<{
         hits: T[];

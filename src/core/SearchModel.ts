@@ -17,7 +17,7 @@ import { log, logError, logWarn, debug } from '../utils/logging'
 
 export interface SearchOptions {
   limit?: number
-  sort?: string
+  sort?: string | Record<string, unknown>[]
   page?: number
 }
 

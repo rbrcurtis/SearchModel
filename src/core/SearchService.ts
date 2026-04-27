@@ -251,7 +251,7 @@ class SearchService {
           fromJSON: (data: Partial<T>) => T
         }),
     terms: string[],
-    options: { limit?: number; sort?: string; page?: number } = {}
+    options: { limit?: number; sort?: string | Record<string, unknown>[]; page?: number } = {}
   ): Promise<{ hits: T[]; total: number }> {
     let indexName: string
     let isModelClass = false
@@ -283,17 +283,22 @@ class SearchService {
     }
 
     if (sort) {
-      // Handle sort format: "field:order" or just "field"
-      let fieldName = sort
-      let sortOrder = 'asc'
+      if (Array.isArray(sort)) {
+        // Raw ES sort array — pass through directly
+        searchBody.sort = sort
+      } else {
+        // Handle sort format: "field:order" or just "field"
+        let fieldName = sort
+        let sortOrder = 'asc'
 
-      if (sort.includes(':')) {
-        const [field, order] = sort.split(':')
-        fieldName = field
-        sortOrder = order === 'desc' ? 'desc' : 'asc'
+        if (sort.includes(':')) {
+          const [field, order] = sort.split(':')
+          fieldName = field
+          sortOrder = order === 'desc' ? 'desc' : 'asc'
+        }
+
+        searchBody.sort = [{ [fieldName]: { order: sortOrder } }]
       }
-
-      searchBody.sort = [{ [fieldName]: { order: sortOrder } }]
     }
 
     if (page && page > 1) {

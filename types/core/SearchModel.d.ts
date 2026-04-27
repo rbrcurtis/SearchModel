@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { FieldMetadata } from '../decorators';
 export interface SearchOptions {
     limit?: number;
-    sort?: string;
+    sort?: string | Record<string, unknown>[];
     page?: number;
 }
 export interface SaveEvent {
