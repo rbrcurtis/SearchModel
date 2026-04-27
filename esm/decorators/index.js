@@ -23,6 +23,13 @@ function validateObjectProperties(obj, properties, fieldPath) {
         }
     }
 }
+function getVectorDimension(options, propertyKey) {
+    const dimension = options?.dimension;
+    if (!Number.isInteger(dimension) || dimension <= 0) {
+        throw new Error(`Vector field '${propertyKey}' dimension must be a positive integer`);
+    }
+    return dimension;
+}
 export function validateFieldType(value, type, propertyKey, options) {
     switch (type) {
         case 'date':
@@ -72,6 +79,21 @@ export function validateFieldType(value, type, propertyKey, options) {
                 }
             }
             break;
+        case 'vector': {
+            if (!Array.isArray(value)) {
+                throw new Error(`Field '${propertyKey}' must be an array, got ${typeof value}`);
+            }
+            const dimension = getVectorDimension(options, propertyKey);
+            if (value.length !== dimension) {
+                throw new Error(`Field '${propertyKey}' must have dimension ${dimension}, got ${value.length}`);
+            }
+            for (let i = 0; i < value.length; i++) {
+                if (typeof value[i] !== 'number' || !Number.isFinite(value[i])) {
+                    throw new Error(`Field '${propertyKey}' must be an array of finite numbers, found ${typeof value[i]} at index ${i}`);
+                }
+            }
+            break;
+        }
         case 'object':
             if (value === null) {
                 throw new Error(`Field '${propertyKey}' must be an object, got null`);
@@ -264,6 +286,17 @@ export function StringArrayType(options = {}) {
             options,
         });
         createValidatedProperty(target, propertyKey, 'stringArray', options);
+    };
+}
+export function VectorType(options) {
+    return function (target, propertyKey) {
+        getVectorDimension(options, propertyKey);
+        setFieldMetadata(target, {
+            propertyKey,
+            type: 'vector',
+            options,
+        });
+        createValidatedProperty(target, propertyKey, 'vector', options);
     };
 }
 export function ObjectType(options) {

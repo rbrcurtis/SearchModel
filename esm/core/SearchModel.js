@@ -146,6 +146,13 @@ export class SearchModel {
                 return { type: 'text', fields: { keyword: { type: 'keyword' } } };
             case 'geoPoint':
                 return { type: 'geo_point' };
+            case 'vector': {
+                const dimension = options?.dimension;
+                if (!Number.isInteger(dimension) || dimension <= 0) {
+                    throw new Error(`Vector field '${field.propertyKey}' dimension must be a positive integer`);
+                }
+                return { type: 'knn_vector', dimension };
+            }
             default:
                 return { type: 'text' };
         }
@@ -293,6 +300,10 @@ export class SearchModel {
                 throw new Error(`Required field '${field.propertyKey}' is missing`);
             }
         }
+    }
+    validate() {
+        this.applyDefaults();
+        this.validateRequiredFields();
     }
     async save(options = {}) {
         debug('search', `[SearchModel.save] Starting save for ${this.constructor.name} (ID: ${this.id})`, {

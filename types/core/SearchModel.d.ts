@@ -49,6 +49,7 @@ export declare abstract class SearchModel<T extends SearchModel<T>> {
     static getById<T extends SearchModel<T>>(this: new (data?: Partial<T>) => T, id: string): Promise<T | null>;
     private applyDefaults;
     private validateRequiredFields;
+    validate(): void;
     save(options?: SaveOptions): Promise<this>;
     delete(): Promise<void>;
     toJSON(): any;
