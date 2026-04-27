@@ -242,6 +242,15 @@ export abstract class SearchModel<T extends SearchModel<T>> {
         return { type: 'text', fields: { keyword: { type: 'keyword' } } }
       case 'geoPoint':
         return { type: 'geo_point' }
+      case 'vector': {
+        const dimension = (options as any)?.dimension
+        if (!Number.isInteger(dimension) || dimension <= 0) {
+          throw new Error(
+            `Vector field '${field.propertyKey}' dimension must be a positive integer`
+          )
+        }
+        return { type: 'knn_vector', dimension }
+      }
       default:
         return { type: 'text' }
     }
@@ -458,6 +467,11 @@ export abstract class SearchModel<T extends SearchModel<T>> {
         throw new Error(`Required field '${field.propertyKey}' is missing`)
       }
     }
+  }
+
+  public validate(): void {
+    this.applyDefaults()
+    this.validateRequiredFields()
   }
 
   // Instance methods

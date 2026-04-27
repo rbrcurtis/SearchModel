@@ -10,6 +10,7 @@ export {
   NumberType,
   BooleanType,
   StringArrayType,
+  VectorType,
   ObjectType,
   ObjectArrayType,
   KeywordType,

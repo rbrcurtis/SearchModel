@@ -37,6 +37,10 @@ interface StringFieldOptions extends BaseFieldOptions {
   upperCase?: boolean
 }
 
+interface VectorFieldOptions extends BaseFieldOptions {
+  dimension: number
+}
+
 /**
  * Definition for a property within an ObjectType or ObjectArrayType field.
  * Used to define nested object structures with validation.
@@ -57,7 +61,12 @@ interface ObjectPropertyDefinition {
     | 'keyword'
     | 'stringMap'
     | 'geoPoint'
-  options?: BaseFieldOptions | StringFieldOptions | ObjectFieldOptions
+    | 'vector'
+  options?:
+    | BaseFieldOptions
+    | StringFieldOptions
+    | ObjectFieldOptions
+    | VectorFieldOptions
 }
 
 /**
@@ -89,7 +98,12 @@ export interface FieldMetadata {
     | 'keyword'
     | 'stringMap'
     | 'geoPoint'
-  options?: BaseFieldOptions | StringFieldOptions | ObjectFieldOptions
+    | 'vector'
+  options?:
+    | BaseFieldOptions
+    | StringFieldOptions
+    | ObjectFieldOptions
+    | VectorFieldOptions
 }
 
 /**
@@ -133,6 +147,18 @@ function validateObjectProperties(
       validateFieldType(propValue, propDef.type, propPath, propDef.options)
     }
   }
+}
+
+function getVectorDimension(options: any, propertyKey: string): number {
+  const dimension = options?.dimension
+
+  if (!Number.isInteger(dimension) || dimension <= 0) {
+    throw new Error(
+      `Vector field '${propertyKey}' dimension must be a positive integer`
+    )
+  }
+
+  return dimension
 }
 
 /**
@@ -217,6 +243,29 @@ export function validateFieldType(
         }
       }
       break
+    case 'vector': {
+      if (!Array.isArray(value)) {
+        throw new Error(
+          `Field '${propertyKey}' must be an array, got ${typeof value}`
+        )
+      }
+
+      const dimension = getVectorDimension(options, propertyKey)
+      if (value.length !== dimension) {
+        throw new Error(
+          `Field '${propertyKey}' must have dimension ${dimension}, got ${value.length}`
+        )
+      }
+
+      for (let i = 0; i < value.length; i++) {
+        if (typeof value[i] !== 'number' || !Number.isFinite(value[i])) {
+          throw new Error(
+            `Field '${propertyKey}' must be an array of finite numbers, found ${typeof value[i]} at index ${i}`
+          )
+        }
+      }
+      break
+    }
     case 'object':
       if (value === null) {
         throw new Error(`Field '${propertyKey}' must be an object, got null`)
@@ -613,6 +662,19 @@ export function StringArrayType(options: BaseFieldOptions = {}) {
       options,
     })
     createValidatedProperty(target, propertyKey, 'stringArray', options)
+  }
+}
+
+export function VectorType(options: VectorFieldOptions) {
+  return function (target: any, propertyKey: string): void {
+    getVectorDimension(options, propertyKey)
+
+    setFieldMetadata(target, {
+      propertyKey,
+      type: 'vector',
+      options,
+    })
+    createValidatedProperty(target, propertyKey, 'vector', options)
   }
 }
 
