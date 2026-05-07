@@ -340,7 +340,7 @@ export class SearchModel {
             debug('search', `[SearchModel.save] Existing document - incrementing version from ${currentVersion} to ${this.version}`);
         }
         this.updatedAt = now;
-        const document = this.toJSON();
+        const document = this.toSearch();
         debug('search', `[SearchModel.save] About to send request to Elasticsearch`, {
             indexName,
             documentId: this.id,
@@ -398,7 +398,23 @@ export class SearchModel {
         }
     }
     toJSON() {
-        return this.toSearch();
+        return this.redactVectorFields(this.toSearch());
+    }
+    redactVectorFields(document) {
+        const fieldMetadata = getFieldMetadata(this.constructor.prototype);
+        const redacted = { ...document };
+        for (const field of fieldMetadata) {
+            if (field.type !== 'vector')
+                continue;
+            if (!(field.propertyKey in redacted))
+                continue;
+            const value = redacted[field.propertyKey];
+            const dimensions = Array.isArray(value)
+                ? value.length
+                : field.options?.dimension;
+            redacted[field.propertyKey] = `[vector: ${dimensions} dimensions]`;
+        }
+        return redacted;
     }
     transformObjectValue(value, properties) {
         if (!value || typeof value !== 'object')
@@ -461,7 +477,7 @@ export class SearchModel {
         }
     }
     toString() {
-        return JSON.stringify(this.toSearch());
+        return JSON.stringify(this.toJSON());
     }
     update(data) {
         const fieldMetadata = getFieldMetadata(this.constructor.prototype);

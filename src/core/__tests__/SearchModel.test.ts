@@ -1,7 +1,7 @@
 import 'reflect-metadata'
 import { Mocked } from 'vitest'
 import { SearchModel } from '../SearchModel'
-import { StringType, NumberType, DateType, BooleanType } from '../../decorators'
+import { StringType, NumberType, DateType, BooleanType, VectorType } from '../../decorators'
 import { search, SearchError, VersionConflictError } from '../SearchService'
 import { id } from '../../utils/id'
 
@@ -41,31 +41,41 @@ class TestModel extends SearchModel<TestModel> {
 // Test model with lifecycle hooks
 class ModelWithHooks extends SearchModel<ModelWithHooks> {
   static readonly indexName = 'hooks-index'
-  
+
   @StringType()
   name!: string
-  
+
   beforeSaveCalled = false
   afterSaveCalled = false
   beforeDeleteCalled = false
   afterDeleteCalled = false
-  
+
   protected async beforeSave(event: any): Promise<boolean> {
     this.beforeSaveCalled = true
     return true
   }
-  
+
   protected async afterSave(event: any): Promise<void> {
     this.afterSaveCalled = true
   }
-  
+
   protected async beforeDelete(event: any): Promise<void> {
     this.beforeDeleteCalled = true
   }
-  
+
   protected async afterDelete(event: any): Promise<void> {
     this.afterDeleteCalled = true
   }
+}
+
+class VectorSerializationModel extends SearchModel<VectorSerializationModel> {
+  static readonly indexName = 'vector-serialization-index'
+
+  @StringType()
+  name!: string
+
+  @VectorType({ dimension: 3 })
+  embedding?: number[]
 }
 
 describe('SearchModel', () => {
@@ -363,9 +373,9 @@ describe('SearchModel', () => {
         _id: testId,
         _version: 1
       })
-      
+
       const model = new TestModel({ id: testId, name: 'Test' })
-      
+
       // Test with wait: false
       await model.save({ wait: false })
       expect(search.searchRequest).toHaveBeenCalledWith(
@@ -373,15 +383,38 @@ describe('SearchModel', () => {
         `/test-index/_doc/${testId}`,
         expect.any(Object)
       )
-      
+
       mockedSearch.searchRequest.mockClear()
-      
+
       // Test with wait: true (explicit)
       await model.save({ wait: true })
       expect(search.searchRequest).toHaveBeenCalledWith(
         'PUT',
         `/test-index/_doc/${testId}?refresh=wait_for`,
         expect.any(Object)
+      )
+    })
+
+    it('should save raw vector values even when toJSON redacts them', async () => {
+      mockedSearch.searchRequest.mockResolvedValue({
+        _id: id(),
+        _version: 1,
+      })
+
+      const model = new VectorSerializationModel({
+        name: 'Vector Test',
+        embedding: [0.1, 0.2, 0.3],
+      })
+
+      await model.save()
+
+      expect(search.searchRequest).toHaveBeenCalledWith(
+        'PUT',
+        expect.stringContaining('/vector-serialization-index/_doc/'),
+        expect.objectContaining({
+          name: 'Vector Test',
+          embedding: [0.1, 0.2, 0.3],
+        })
       )
     })
   })
@@ -601,14 +634,28 @@ describe('SearchModel', () => {
         score: 100,
         isActive: true
       })
-      
+
       const json = model.toJSON()
-      
+
       expect(json).toEqual(expect.objectContaining({
         id: testId,
         name: 'Test',
         score: 100,
         isActive: true
+      }))
+    })
+
+    it('should redact vector fields', () => {
+      const model = new VectorSerializationModel({
+        name: 'Vector Test',
+        embedding: [0.1, 0.2, 0.3],
+      })
+
+      const json = model.toJSON()
+
+      expect(json).toEqual(expect.objectContaining({
+        name: 'Vector Test',
+        embedding: '[vector: 3 dimensions]',
       }))
     })
   })
@@ -634,10 +681,21 @@ describe('SearchModel', () => {
     it('should return JSON string representation', () => {
       const model = new TestModel({ name: 'Test' })
       const str = model.toString()
-      
+
       expect(typeof str).toBe('string')
       const parsed = JSON.parse(str)
       expect(parsed).toHaveProperty('name', 'Test')
+    })
+
+    it('should redact vector fields in string output', () => {
+      const model = new VectorSerializationModel({
+        name: 'Vector Test',
+        embedding: [0.1, 0.2, 0.3],
+      })
+      const str = model.toString()
+
+      expect(str).toContain('"embedding":"[vector: 3 dimensions]"')
+      expect(str).not.toContain('[0.1,0.2,0.3]')
     })
   })
 })

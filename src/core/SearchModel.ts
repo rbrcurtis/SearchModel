@@ -539,7 +539,7 @@ export abstract class SearchModel<T extends SearchModel<T>> {
     }
     this.updatedAt = now
 
-    const document = this.toJSON()
+    const document = this.toSearch()
 
     debug(
       'search',
@@ -644,9 +644,27 @@ export abstract class SearchModel<T extends SearchModel<T>> {
     }
   }
 
-  // Convert model instance to JSON for storage using field decorators
+  // Convert model instance to JSON for logging/debugging using field decorators
   public toJSON(): any {
-    return this.toSearch()
+    return this.redactVectorFields(this.toSearch())
+  }
+
+  private redactVectorFields(document: Record<string, any>): Record<string, any> {
+    const fieldMetadata = getFieldMetadata(this.constructor.prototype)
+    const redacted = { ...document }
+
+    for (const field of fieldMetadata) {
+      if (field.type !== 'vector') continue
+      if (!(field.propertyKey in redacted)) continue
+
+      const value = redacted[field.propertyKey]
+      const dimensions = Array.isArray(value)
+        ? value.length
+        : (field.options as { dimension?: number } | undefined)?.dimension
+      redacted[field.propertyKey] = `[vector: ${dimensions} dimensions]`
+    }
+
+    return redacted
   }
 
   // Recursively transform nested objects
@@ -730,7 +748,7 @@ export abstract class SearchModel<T extends SearchModel<T>> {
   }
 
   public toString(): string {
-    return JSON.stringify(this.toSearch())
+    return JSON.stringify(this.toJSON())
   }
 
   // Update multiple properties at once without saving
