@@ -39,49 +39,62 @@ DEBUG_TAGS=elasticsearch,search  # Optional: for debug logging
 
 ```typescript
 import 'dotenv/config'
-import { 
-  SearchModel, 
-  StringType, 
-  DateType, 
+import {
+  SearchModel,
+  StringType,
+  KeywordType,
+  DateType,
   NumberType,
   ObjectType,
-  StringArrayType 
+  StringArrayType,
 } from 'search-model'
 
-class User extends SearchModel {
+class User extends SearchModel<User> {
   static readonly indexName = 'users'
 
-  // Note: id, createdAt, updatedAt, and version are inherited automatically
-  // from SearchModel - you don't need to define them!
+  // These fields exist on SearchModel, but redeclaring them helps API decorators
+  // and makes the model contract obvious to agents and generated schemas.
+  // Use `declare` so TypeScript does not emit class fields that overwrite base accessors.
+  @KeywordType()
+  declare id: string
 
-  @StringType({
+  @DateType()
+  declare createdAt: Date
+
+  @DateType()
+  declare updatedAt: Date
+
+  @NumberType()
+  declare version: number
+
+  @KeywordType({
     required: true,
     trim: true,
     lowerCase: true,
     validate: (email) => email.includes('@')
   })
   email!: string
-  
+
   @StringType({ required: true, trim: true })
   name!: string
-  
-  @NumberType({ 
-    validate: (age) => age >= 0 && age <= 150 
+
+  @NumberType({
+    validate: (age) => age >= 0 && age <= 150
   })
   age?: number
-  
+
   @DateType()
   birthDate?: Date
-  
-  @StringArrayType()
+
+  @StringArrayType({ default: () => [] })
   roles!: string[]
-  
+
   @ObjectType({
     properties: {
       street: { type: 'string', options: { required: true } },
       city: { type: 'string', options: { required: true } },
       zipCode: { type: 'string' },
-      country: { type: 'string' }
+      country: { type: 'keyword' }
     }
   })
   address?: {
@@ -127,7 +140,7 @@ const user = await User.getById('507f1f77bcf86cd799439011')
 user.name = 'Jane Doe'
 await user.save()
 
-// Update multiple fields at once
+// Update multiple fields at once; update() mutates the instance but does not save
 user.update({
   name: 'Jane Smith',
   age: 32,
@@ -135,11 +148,9 @@ user.update({
 })
 await user.save()
 
-// ⚠️ Important: Array mutations (push, pop, etc.) are NOT tracked
-// Wrong: user.roles.push('editor') - NOT saved!
-// Correct: user.roles = [...user.roles, 'editor']
-user.roles = [...user.roles, 'editor']
-await user.save()
+// Array mutations are tracked by the current SearchModel array proxy
+user.roles.push('moderator')
+await user.save({ wait: true }) // use wait when immediate read-after-write matters
 
 // Delete
 await user.delete()
@@ -147,12 +158,46 @@ await user.delete()
 
 ## Automatic Fields
 
-All models extending `SearchModel` automatically include these fields without needing to define them:
+All models extending `SearchModel` automatically include these fields:
 
 - **`id`** - Unique document identifier (MongoDB ObjectID format)
 - **`createdAt`** - Timestamp when document was first created
 - **`updatedAt`** - Timestamp when document was last modified
 - **`version`** - Version number for optimistic locking (starts at 1)
+
+You may redeclare these fields in subclasses when API decorators, schema generation, or readability benefit from explicit declarations. Use TypeScript `declare` so no JavaScript class field is emitted:
+
+```typescript
+class User extends SearchModel<User> {
+  static readonly indexName = 'users'
+
+  @KeywordType()
+  declare id: string
+
+  @DateType()
+  declare createdAt: Date
+
+  @DateType()
+  declare updatedAt: Date
+
+  @NumberType()
+  declare version: number
+}
+```
+
+This pattern also works with API/schema decorators such as TypeGraphQL decorators. Prefer explicit TypeGraphQL type functions instead of relying only on reflected metadata:
+
+```typescript
+@Field(() => ID)
+@KeywordType()
+declare id: string
+
+@Field(() => Date)
+@DateType()
+declare createdAt: Date
+```
+
+Do not initialize SearchModel fields with inline class property defaults such as `roles = []`; put defaults in decorator options (`@StringArrayType({ default: () => [] })`) so the decorator-backed storage and validation stay consistent.
 
 ### Automatic Timestamp Management
 
@@ -181,47 +226,48 @@ console.log(user.updatedAt) // 2024-01-15T10:35:00.000Z (updated)
 console.log(user.version)   // 2
 ```
 
-You never need to manually set these fields - they are managed automatically by the base class.
+You normally do not manually set these fields at runtime - they are managed automatically by the base class.
 
 ## Field Decorators
 
 ### Basic Types
 
-- `@StringType(options)` - String fields with trim, case conversion
-- `@NumberType(options)` - Numeric fields
+- `@StringType(options)` - Analyzed full-text fields such as names, titles, descriptions, and content
+- `@KeywordType(options)` - Exact-match fields for IDs, emails, slugs, statuses, enum-like strings, filters, sorting, and aggregations
+- `@NumberType(options)` - Numeric fields; numeric strings are coerced on assignment when valid
 - `@DateType(options)` - Date fields (accepts Date objects or ISO strings)
+- `@DateOnlyType(options)` - Date-only fields stored in `YYYY-MM-DD` form
 - `@BooleanType(options)` - Boolean fields
-- `@KeywordType(options)` - Elasticsearch keyword fields (not analyzed)
 
 ### Array Types
 
 - `@StringArrayType(options)` - Array of strings
-- `@ObjectArrayType(options)` - Array of nested objects
+- `@ObjectArrayType(options)` - Array of structured objects; flattened by default
+- `@ObjectArrayType({ nested: true, properties })` - Elasticsearch nested mapping when array item boundaries matter for querying
 
-**⚠️ Important: Array Mutation Limitation**
-
-The ORM **cannot detect** array mutations using methods like `.push()`, `.pop()`, `.splice()`, etc. You must reassign the entire array for changes to be tracked:
+Array mutations such as `.push()`, `.pop()`, and `.splice()` are tracked by the current SearchModel array proxy for `StringArrayType` and `ObjectArrayType` fields:
 
 ```typescript
-// ❌ Wrong - changes NOT tracked
 user.roles.push('editor')
-await user.save() // Changes will NOT be saved
+await user.save()
 
-// ✅ Correct - reassign the array
-user.roles = [...user.roles, 'editor']
-await user.save() // Changes ARE tracked and saved
-
-// ✅ Also correct
-user.roles = user.roles.concat('editor')
+user.roles = [...user.roles, 'moderator']
 await user.save()
 ```
-
-This applies to all array types including `@StringArrayType()` and `@ObjectArrayType()`.
 
 ### Complex Types
 
 - `@ObjectType(options)` - Nested object with property definitions
-- `@StringMapType(options)` - JSON-serialized object (stored as string)
+- `@StringMapType(options)` - Arbitrary JSON-ish object stored as a JSON string; not queryable by nested keys
+- `@GeoPointType(options)` - Geographic point stored as `{ lat: number, lon: number }`
+- `@VectorType({ dimension })` - OpenSearch `knn_vector`; values must be finite numbers with the exact configured dimension
+
+### Mapping Notes
+
+- Fields ending in `id` or `ids` are automatically mapped as `keyword` even when declared with `@StringType()`.
+- Prefer explicit `@KeywordType()` for IDs, statuses, slugs, and enum-like fields anyway; it documents intent.
+- `@StringType()` maps to `text` with a `.keyword` subfield.
+- `@KeywordType()` maps to `keyword` and is the safe default for exact filters.
 
 ### Decorator Options
 
@@ -249,41 +295,44 @@ interface StringFieldOptions extends BaseFieldOptions {
 ## Lifecycle Hooks
 
 ```typescript
-class Post extends SearchModel {
+class Post extends SearchModel<Post> {
   static readonly indexName = 'posts'
-  
+
   @StringType({ required: true })
   title!: string
-  
+
   @StringType()
   slug!: string
-  
-  protected async beforeSave(event: SaveEvent): Promise<void> {
+
+  protected async beforeSave(event: SaveEvent): Promise<boolean> {
     // Generate slug from title
     if (!this.slug) {
       this.slug = this.title.toLowerCase().replace(/\s+/g, '-')
     }
+    return true
   }
-  
+
   protected async afterSave(event: SaveEvent): Promise<void> {
     console.log('Updated fields:', event.updated)
     // Trigger cache invalidation, send notifications, etc.
   }
-  
+
   protected async beforeDelete(event: DeleteEvent): Promise<void> {
     // Clean up related data
   }
-  
+
   protected async afterDelete(event: DeleteEvent): Promise<void> {
     // Log deletion, update counters, etc.
   }
 }
 ```
 
+`beforeSave` can return `false` to skip saving. `event.updated` is computed before `beforeSave`, so fields changed inside `beforeSave` may not appear in that event. Defaults and required-field validation run after `beforeSave`.
+
 ## Nested Objects
 
 ```typescript
-class BlogPost extends SearchModel {
+class BlogPost extends SearchModel<BlogPost> {
   static readonly indexName = 'blog_posts'
   
   @StringType({ required: true })
@@ -323,7 +372,7 @@ class BlogPost extends SearchModel {
 
 ## Search Queries
 
-The search uses Elasticsearch query string syntax:
+SearchModel uses Elasticsearch query-string terms as an array of strings. Terms are combined as `must` clauses with `default_operator: 'AND'`.
 
 ```typescript
 // Simple field search
@@ -344,20 +393,36 @@ await User.find(['updatedAt:[2024-01-01 TO *]'])
 
 // Sort by automatic timestamp fields
 await User.find(['status:active'], {
-  sort: 'createdAt:desc',  // Most recent first
+  sort: 'createdAt:desc',
   limit: 10
 })
 
-// Complex queries
-await User.find([
-  'status:active',
-  'createdAt:[2024-01-01 TO *]',
-  'email:*@company.com'
-], {
+// Find with total count
+const { hits, total } = await User.findWithTotal(['status:active'], {
   limit: 50,
-  sort: 'updatedAt:desc',  // Sort by last modified
+  sort: 'updatedAt:desc',
   page: 2
 })
+
+// Find one document
+const user = await User.findOne(['email:john@example.com'])
+
+// Raw Elasticsearch sort arrays are allowed when needed
+await User.find(['status:active'], {
+  sort: [{ createdAt: { order: 'desc' } }]
+})
+```
+
+Do not use ORM-style where objects; they are not part of this API:
+
+```typescript
+// ❌ Wrong
+await User.find({ where: { status: 'active' } })
+await User.findOne({ email: 'john@example.com' })
+
+// ✅ Correct
+await User.find(['status:active'])
+await User.findOne(['email:john@example.com'])
 ```
 
 ## Direct Elasticsearch Access
@@ -543,7 +608,7 @@ await walkIndex(
 Models automatically track which fields have been modified:
 
 ```typescript
-class Product extends SearchModel {
+class Product extends SearchModel<Product> {
   static readonly indexName = 'products'
 
   @StringType({ required: true })
@@ -562,21 +627,19 @@ class Product extends SearchModel {
 }
 ```
 
-**⚠️ Array Mutation Limitation**
+**Array mutation tracking**
 
-Change tracking works by detecting when property setters are called. Array mutations (`.push()`, `.pop()`, `.splice()`, etc.) modify the array in-place without calling the setter, so they are **not tracked**:
+Current SearchModel wraps `StringArrayType` and `ObjectArrayType` values in an array proxy, so array mutations are tracked:
 
 ```typescript
-// ❌ Wrong - NOT tracked
 product.tags.push('new-tag')
-console.log(product.getChangedFields()) // [] - empty!
+console.log(product.getChangedFields()) // ['tags']
 
-// ✅ Correct - IS tracked
-product.tags = [...product.tags, 'new-tag']
+product.tags = [...product.tags, 'another-tag']
 console.log(product.getChangedFields()) // ['tags']
 ```
 
-Always reassign arrays when making changes to ensure proper change tracking.
+Vector arrays are intentionally not proxy-wrapped. Assign a full new vector array when changing a `VectorType` field.
 
 ## Error Handling
 
@@ -603,8 +666,18 @@ try {
 
 The library reads configuration from environment variables:
 
-- `ELASTICSEARCH_URL` - Elasticsearch server URL (required, no default)
+- `ELASTICSEARCH_URL` - Elasticsearch/OpenSearch server URL (required, no default)
 - `DEBUG_TAGS` - Comma-separated debug tags for logging (e.g., "elasticsearch,search")
+
+The variable is named `ELASTICSEARCH_URL` even when the backing service is OpenSearch. If an app uses a different environment variable such as `OPENSEARCH_NODE`, map it before model operations:
+
+```typescript
+if (!process.env.ELASTICSEARCH_URL && process.env.OPENSEARCH_NODE) {
+  process.env.ELASTICSEARCH_URL = process.env.OPENSEARCH_NODE
+}
+```
+
+For tests or workflows that immediately read after writing, use `save({ wait: true })` to request `refresh=wait_for`.
 
 ## API Reference
 
@@ -626,9 +699,9 @@ The library reads configuration from environment variables:
 - `save()` - Save document to Elasticsearch (creates new or updates existing)
 - `update(data)` - Update multiple properties at once without saving (returns `this` for chaining)
 - `delete()` - Delete document from Elasticsearch
-- `toJSON()` - Convert to plain object with all field values
-- `toSearch()` - Convert to Elasticsearch document format (same as toJSON)
-- `toString()` - Convert to JSON string representation
+- `toJSON()` - Convert to plain object for API/logging output; vector fields are redacted as `[vector: N dimensions]`
+- `toSearch()` - Convert to Elasticsearch/OpenSearch document format with persisted values, including full vectors
+- `toString()` - Convert redacted `toJSON()` output to a JSON string representation
 
 ### SearchModel Protected Methods (for subclasses)
 
@@ -661,6 +734,55 @@ export async function GET() {
 
 This is necessary because Next.js API routes run in a different JavaScript context where the getter initialization from decorators doesn't work the same way as in Node.js scripts.
 
+### Common Mistakes to Avoid
+
+```typescript
+// ❌ Wrong: no generic, no clear model type
+class User extends SearchModel {}
+
+// ✅ Correct
+class User extends SearchModel<User> {
+  static readonly indexName = 'users'
+}
+
+// ❌ Wrong: class property defaults bypass the decorator default pattern
+class User extends SearchModel<User> {
+  @StringArrayType()
+  roles: string[] = []
+}
+
+// ✅ Correct
+class User extends SearchModel<User> {
+  @StringArrayType({ default: () => [] })
+  roles!: string[]
+}
+
+// ✅ Correct: redeclare inherited fields for API decorators/schema visibility
+class User extends SearchModel<User> {
+  @KeywordType()
+  declare id: string
+}
+
+// ❌ Wrong: where-object queries are not supported
+await User.find({ where: { status: 'active' } })
+
+// ✅ Correct
+await User.find(['status:active'])
+
+// ❌ Wrong: update() does not save
+user.update({ status: 'active' })
+return user
+
+// ✅ Correct
+user.update({ status: 'active' })
+await user.save()
+
+// ❌ Wrong: assuming createIndex migrates existing mappings
+await User.createIndex()
+
+// ✅ Correct: treat mapping changes as schema migrations and verify them against Elasticsearch/OpenSearch
+```
+
 ### SearchService Methods
 
 - `searchRequest(method, path, data, options?)` - Raw Elasticsearch HTTP request with optional version control
@@ -670,7 +792,7 @@ This is necessary because Next.js API routes run in a different JavaScript conte
 ### SearchService Configuration
 
 The SearchService uses the following configuration from environment variables:
-- `ELASTICSEARCH_URL` - Elasticsearch server URL (required, no default)
+- `ELASTICSEARCH_URL` - Elasticsearch/OpenSearch server URL (required, no default)
 
 The service automatically handles:
 - Maximum retry attempts for failed requests: 3

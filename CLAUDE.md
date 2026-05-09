@@ -189,13 +189,12 @@ These are applied in the order: trim → case conversion
 - Changes are cleared after successful save
 - Used by lifecycle hooks to know what changed
 
-**Critical Limitation: Array Mutations Not Detected**
-- Array methods like `.push()`, `.pop()`, `.splice()` modify arrays in-place without calling setters
-- These mutations are NOT tracked and will NOT be saved
-- Solution: Always reassign the entire array when making changes
-  - Wrong: `user.roles.push('admin')`
-  - Correct: `user.roles = [...user.roles, 'admin']`
-- This applies to `@StringArrayType()`, `@ObjectArrayType()`, and arrays within nested objects
+**Array Mutation Tracking**
+- `@StringArrayType()` and `@ObjectArrayType()` values are wrapped in an array proxy, so mutations like `.push()`, `.pop()`, and `.splice()` are tracked
+- Reassigning the full array also works and remains a safe style
+  - Valid: `user.roles.push('admin')`
+  - Also valid: `user.roles = [...user.roles, 'admin']`
+- Vector arrays are intentionally not proxy-wrapped; assign a full new vector array when changing `@VectorType()` fields
 
 ### Lifecycle Hooks
 Subclasses can override protected lifecycle methods:
@@ -217,6 +216,46 @@ The library implements optimistic locking with version fields:
 - JSON.parse on load from Elasticsearch
 - Stored as text in Elasticsearch
 
+### Redeclaring Base Fields for API Decorators
+SearchModel automatically provides `id`, `createdAt`, `updatedAt`, and `version`, but subclasses may redeclare them when API/schema decorators or agent discoverability benefit from explicit fields. Use TypeScript `declare` so no JavaScript class field is emitted and base accessors are not overwritten:
+
+```typescript
+class Story extends SearchModel<Story> {
+  static readonly indexName = 'stories'
+
+  @KeywordType()
+  declare id: string
+
+  @DateType()
+  declare createdAt: Date
+
+  @DateType()
+  declare updatedAt: Date
+
+  @NumberType()
+  declare version: number
+}
+```
+
+This pattern works with TypeGraphQL-style decorators too; prefer explicit type functions like `@Field(() => ID)` and `@Field(() => Date)` rather than relying only on reflected metadata.
+
+### Defaults Belong in Decorators
+Do not use inline property initializers for SearchModel fields. Put defaults in decorator options so decorator-backed storage and validation stay consistent:
+
+```typescript
+// Wrong
+class User extends SearchModel<User> {
+  @StringArrayType()
+  roles: string[] = []
+}
+
+// Correct
+class User extends SearchModel<User> {
+  @StringArrayType({ default: () => [] })
+  roles!: string[]
+}
+```
+
 ### Next.js API Route Caveat
 When using SearchModel instances in Next.js API routes, getter properties don't work properly due to execution context. Always use `.toJSON()`:
 ```typescript
@@ -234,13 +273,23 @@ return NextResponse.json({ name: userData?.name })
 
 ### Defining a Model
 ```typescript
-import { SearchModel, StringType, NumberType, ObjectType } from 'search-model'
+import { SearchModel, StringType, KeywordType, DateType, NumberType, ObjectType } from 'search-model'
 
-class MyModel extends SearchModel {
+class MyModel extends SearchModel<MyModel> {
   static readonly indexName = 'my_index'
 
-  // Note: id, createdAt, updatedAt, and version are inherited from SearchModel
-  // You don't need to define them - they're automatic!
+  // These exist on SearchModel, but explicit redeclarations help API decorators and generated schemas.
+  @KeywordType()
+  declare id: string
+
+  @DateType()
+  declare createdAt: Date
+
+  @DateType()
+  declare updatedAt: Date
+
+  @NumberType()
+  declare version: number
 
   @StringType({ required: true, trim: true })
   name!: string
@@ -282,8 +331,16 @@ sections!: Array<{
 ```
 
 ## Environment Variables
-- `ELASTICSEARCH_URL` - Elasticsearch server URL (required)
+- `ELASTICSEARCH_URL` - Elasticsearch/OpenSearch server URL (required). Keep this name even when the backing service is OpenSearch; map app-specific env vars like `OPENSEARCH_NODE` into `ELASTICSEARCH_URL` before model operations.
 - `DEBUG_TAGS` - Comma-separated debug tags: `elasticsearch,search`
+
+## Query API Rules
+- `find()`, `findOne()`, and `findWithTotal()` take arrays of Elasticsearch query-string terms, not ORM-style where objects.
+- Correct: `await User.find(['status:active', 'email:ryan@example.com'])`
+- Wrong: `await User.find({ where: { status: 'active' } })`
+- `update()` mutates the model instance but never saves; call `await model.save()` afterwards.
+- Use `save({ wait: true })` when tests or workflows immediately read after a write.
+- `createIndex()` creates missing indices and ignores already-exists errors; it is not a complete mapping migration system.
 
 ## Important Notes
 
