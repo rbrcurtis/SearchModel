@@ -433,6 +433,19 @@ describe('SearchModel', () => {
       )
     })
 
+    it('should respect wait option', async () => {
+      const testId = id()
+      mockedSearch.searchRequest.mockResolvedValue({})
+
+      const model = new TestModel({ id: testId, name: 'Test' })
+      await model.delete({ wait: true })
+
+      expect(search.searchRequest).toHaveBeenCalledWith(
+        'DELETE',
+        `/test-index/_doc/${testId}?refresh=wait_for`
+      )
+    })
+
     it('should throw error when id is missing', async () => {
       const model = new TestModel()
       model.id = undefined as any

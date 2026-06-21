@@ -27,4 +27,10 @@ export { log, logError, logWarn, debug } from './utils/logging'
 export { walkIndex } from './utils/walkIndex'
 
 // Type exports
-export type { SaveEvent, DeleteEvent, SearchOptions, SaveOptions } from './core/SearchModel'
+export type {
+  SaveEvent,
+  DeleteEvent,
+  SearchOptions,
+  SaveOptions,
+  DeleteOptions,
+} from './core/SearchModel'

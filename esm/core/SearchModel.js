@@ -376,7 +376,8 @@ export class SearchModel {
             throw error;
         }
     }
-    async delete() {
+    async delete(options = {}) {
+        const { wait = false } = options;
         if (!this.id) {
             throw new Error('Cannot delete document without ID');
         }
@@ -387,7 +388,8 @@ export class SearchModel {
         const deleteEvent = {};
         await this.beforeDelete(deleteEvent);
         try {
-            await searchService.searchRequest('DELETE', `/${indexName}/_doc/${this.id}`);
+            const refreshParam = wait ? '?refresh=wait_for' : '';
+            await searchService.searchRequest('DELETE', `/${indexName}/_doc/${this.id}${refreshParam}`);
             await this.afterDelete(deleteEvent);
         }
         catch (error) {

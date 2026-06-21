@@ -13,6 +13,9 @@ export interface DeleteEvent {
 export interface SaveOptions {
     wait?: boolean;
 }
+export interface DeleteOptions {
+    wait?: boolean;
+}
 export declare abstract class SearchModel<T extends SearchModel<T>> {
     static readonly indexName: string;
     private _changedFields;
@@ -50,7 +53,7 @@ export declare abstract class SearchModel<T extends SearchModel<T>> {
     private applyDefaults;
     private validateRequiredFields;
     save(options?: SaveOptions): Promise<this>;
-    delete(): Promise<void>;
+    delete(options?: DeleteOptions): Promise<void>;
     toJSON(): any;
     private transformObjectValue;
     private transformFieldValue;

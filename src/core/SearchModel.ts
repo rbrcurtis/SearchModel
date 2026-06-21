@@ -33,6 +33,10 @@ export interface SaveOptions {
   wait?: boolean
 }
 
+export interface DeleteOptions {
+  wait?: boolean
+}
+
 export abstract class SearchModel<T extends SearchModel<T>> {
   // Abstract properties that must be implemented by subclasses
   static readonly indexName: string
@@ -611,7 +615,9 @@ export abstract class SearchModel<T extends SearchModel<T>> {
     }
   }
 
-  public async delete(): Promise<void> {
+  public async delete(options: DeleteOptions = {}): Promise<void> {
+    const { wait = false } = options
+
     if (!this.id) {
       throw new Error('Cannot delete document without ID')
     }
@@ -627,9 +633,11 @@ export abstract class SearchModel<T extends SearchModel<T>> {
     await this.beforeDelete(deleteEvent)
 
     try {
+      const refreshParam = wait ? '?refresh=wait_for' : ''
+
       await searchService.searchRequest(
         'DELETE',
-        `/${indexName}/_doc/${this.id}`
+        `/${indexName}/_doc/${this.id}${refreshParam}`
       )
 
       // Call afterDelete lifecycle hook
