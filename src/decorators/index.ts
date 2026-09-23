@@ -382,9 +382,9 @@ function createValidatedProperty(
       ) {
         // Only wrap if not already wrapped
         if (!(value as any).__isTrackedArray) {
-          const trackedArray = createTrackedArray(value, () => {
-            if (this.markFieldChanged) {
-              this.markFieldChanged(propertyKey)
+          const trackedArray = createTrackedArray(value, (before) => {
+            if (this.recordFieldChange) {
+              this.recordFieldChange(propertyKey, storage[propertyKey], before)
             }
           })
           storage[propertyKey] = trackedArray
@@ -430,9 +430,9 @@ function createValidatedProperty(
           Array.isArray(value) &&
           (type === 'stringArray' || type === 'objectArray')
         ) {
-          const trackedArray = createTrackedArray(value, () => {
-            if (this.markFieldChanged) {
-              this.markFieldChanged(propertyKey)
+          const trackedArray = createTrackedArray(value, (before) => {
+            if (this.recordFieldChange) {
+              this.recordFieldChange(propertyKey, storage[propertyKey], before)
             }
           })
           storage[propertyKey] = trackedArray
@@ -444,9 +444,9 @@ function createValidatedProperty(
         storage[propertyKey] = value
       }
 
-      // Track field changes (if the value actually changed and this is a SearchModel instance)
-      if (this.markFieldChanged && oldValue !== value) {
-        this.markFieldChanged(propertyKey)
+      // Track field change with its original value (if the value actually changed)
+      if (this.recordFieldChange) {
+        this.recordFieldChange(propertyKey, storage[propertyKey], oldValue)
       }
     },
     enumerable: true,

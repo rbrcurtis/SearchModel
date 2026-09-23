@@ -37,12 +37,63 @@ export interface DeleteOptions {
   wait?: boolean
 }
 
+// Deep compare for change tracking: === for primitives, element-wise for
+// arrays, own-key compare for plain objects, getTime() for Dates.
+function valuesEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  if (a instanceof Date || b instanceof Date) {
+    return a instanceof Date && b instanceof Date && a.getTime() === b.getTime()
+  }
+  if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') {
+    return false
+  }
+  if (Array.isArray(a) !== Array.isArray(b)) return false
+  if (Array.isArray(a)) {
+    const bArr = b as unknown[]
+    if (a.length !== bArr.length) return false
+    for (let i = 0; i < a.length; i++) {
+      if (!valuesEqual(a[i], bArr[i])) return false
+    }
+    return true
+  }
+  const aObj = a as Record<string, unknown>
+  const bObj = b as Record<string, unknown>
+  const aKeys = Object.keys(aObj)
+  const bKeys = Object.keys(bObj)
+  if (aKeys.length !== bKeys.length) return false
+  return aKeys.every((k) => valuesEqual(aObj[k], bObj[k]))
+}
+
+// Store a shallow copy of arrays so later in-place mutation of the live
+// array does not rewrite the recorded original value.
+function snapshotValue(value: unknown): unknown {
+  if (Array.isArray(value)) return [...value]
+  return value
+}
+
+// Recursively coerce every leaf of a stringMap value to a string while
+// preserving object and array structure. ES dynamic auto-mapping then indexes
+// each key, so the map stays generic and queryable by inner key at any depth.
+function stringifyMapLeaves(value: unknown): unknown {
+  if (value === null || value === undefined) return value
+  if (value instanceof Date) return value.toISOString()
+  if (Array.isArray(value)) return value.map(stringifyMapLeaves)
+  if (typeof value === 'object') {
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = stringifyMapLeaves(v)
+    }
+    return out
+  }
+  return String(value)
+}
+
 export abstract class SearchModel<T extends SearchModel<T>> {
   // Abstract properties that must be implemented by subclasses
   static readonly indexName: string
 
-  // Change tracking - private property to track modified fields
-  private _changedFields: Set<string> = new Set()
+  // Change tracking - maps each changed field name to its original (pre-change) value
+  private _changedFields: Map<string, unknown> = new Map()
 
   // Track if this is a new document that hasn't been saved yet
   private _isNewDocument: boolean = true
@@ -63,12 +114,54 @@ export abstract class SearchModel<T extends SearchModel<T>> {
   // Static utility methods - removed generateId, now using ObjectID-based id() function
 
   // Change tracking methods
+  /**
+   * @deprecated Prefer recordFieldChange, which records the original value
+   * so afterSave can report from/to. Marks a field as changed with an
+   * unknown (undefined) original value.
+   */
   protected markFieldChanged(fieldName: string): void {
-    this._changedFields.add(fieldName)
+    if (fieldName === 'version') return
+    if (!this._changedFields.has(fieldName)) {
+      this._changedFields.set(fieldName, undefined)
+    }
+  }
+
+  /**
+   * Records a field change against its original value.
+   * Called by property setters and the array mutation proxy.
+   * - First change: stores the original (pre-change) value.
+   * - Change back to the original value: removes the field so it is
+   *   no longer considered dirty.
+   */
+  protected recordFieldChange(fieldName: string, next: unknown, prev: unknown): void {
+    // version is auto-managed bookkeeping (bumped on every save), not user
+    // data, so it never counts as a tracked change.
+    if (fieldName === 'version') return
+    if (valuesEqual(next, prev)) return
+    if (this._changedFields.has(fieldName)) {
+      if (valuesEqual(this._changedFields.get(fieldName), next)) {
+        this._changedFields.delete(fieldName)
+      }
+      return
+    }
+    this._changedFields.set(fieldName, snapshotValue(prev))
   }
 
   protected getChangedFields(): string[] {
-    return Array.from(this._changedFields)
+    return Array.from(this._changedFields.keys())
+  }
+
+  /**
+   * Returns a copy of { fieldName: originalValue } for every currently
+   * changed field. Intended for use in afterSave: the internal map is
+   * cleared after the hook runs, so the returned copy is safe to keep.
+   */
+  public getOriginalValues(): Record<string, unknown> {
+    const out: Record<string, unknown> = {}
+    for (const [name, value] of this._changedFields) {
+      out[name] = value
+    }
+    return out
   }
 
   protected clearChangedFields(): void {
@@ -176,6 +269,11 @@ export abstract class SearchModel<T extends SearchModel<T>> {
     const properties: Record<string, any> = {}
 
     for (const field of fieldMetadata) {
+      // stringMap fields are left out of the mapping so Elasticsearch dynamic
+      // auto-mapping indexes each (stringified) leaf key on its own, keeping
+      // the map generic and queryable by inner key at any depth.
+      if (field.type === 'stringMap') continue
+
       // Auto-convert fields ending with "id" or "ids" to keyword type if they're currently string type
       const fieldName = field.propertyKey
       const shouldBeKeyword =
@@ -745,8 +843,10 @@ export abstract class SearchModel<T extends SearchModel<T>> {
         }
         return Array.isArray(value) ? value : []
       case 'stringMap':
-        // Store as JSON string for Elasticsearch
-        return JSON.stringify(value)
+        // Recurse to any depth, coercing leaf values to strings so ES dynamic
+        // auto-mapping indexes each key. Object/array structure is preserved;
+        // ES treats an array of strings like a string, so arrays stay arrays.
+        return stringifyMapLeaves(value)
       case 'geoPoint':
         // Elasticsearch expects { lat: number, lon: number } format
         return { lat: Number(value.lat), lon: Number(value.lon) }

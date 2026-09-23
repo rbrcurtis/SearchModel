@@ -171,9 +171,9 @@ function createValidatedProperty(target, propertyKey, type, options) {
                 Array.isArray(value) &&
                 (type === 'stringArray' || type === 'objectArray')) {
                 if (!value.__isTrackedArray) {
-                    const trackedArray = createTrackedArray(value, () => {
-                        if (this.markFieldChanged) {
-                            this.markFieldChanged(propertyKey);
+                    const trackedArray = createTrackedArray(value, (before) => {
+                        if (this.recordFieldChange) {
+                            this.recordFieldChange(propertyKey, storage[propertyKey], before);
                         }
                     });
                     storage[propertyKey] = trackedArray;
@@ -206,9 +206,9 @@ function createValidatedProperty(target, propertyKey, type, options) {
                 }
                 if (Array.isArray(value) &&
                     (type === 'stringArray' || type === 'objectArray')) {
-                    const trackedArray = createTrackedArray(value, () => {
-                        if (this.markFieldChanged) {
-                            this.markFieldChanged(propertyKey);
+                    const trackedArray = createTrackedArray(value, (before) => {
+                        if (this.recordFieldChange) {
+                            this.recordFieldChange(propertyKey, storage[propertyKey], before);
                         }
                     });
                     storage[propertyKey] = trackedArray;
@@ -220,8 +220,8 @@ function createValidatedProperty(target, propertyKey, type, options) {
             else {
                 storage[propertyKey] = value;
             }
-            if (this.markFieldChanged && oldValue !== value) {
-                this.markFieldChanged(propertyKey);
+            if (this.recordFieldChange) {
+                this.recordFieldChange(propertyKey, storage[propertyKey], oldValue);
             }
         },
         enumerable: true,

@@ -25,7 +25,9 @@ export declare abstract class SearchModel<T extends SearchModel<T>> {
     updatedAt: Date;
     version: number;
     protected markFieldChanged(fieldName: string): void;
+    protected recordFieldChange(fieldName: string, next: unknown, prev: unknown): void;
     protected getChangedFields(): string[];
+    getOriginalValues(): Record<string, unknown>;
     protected clearChangedFields(): void;
     isNew(): boolean;
     protected beforeSave(event: SaveEvent): Promise<boolean>;

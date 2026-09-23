@@ -1,7 +1,7 @@
 import 'reflect-metadata'
 import { Mocked } from 'vitest'
 import { SearchModel } from '../SearchModel'
-import { StringType, NumberType, DateType, BooleanType, VectorType } from '../../decorators'
+import { StringType, NumberType, DateType, BooleanType, VectorType, StringArrayType } from '../../decorators'
 import { search, SearchError, VersionConflictError } from '../SearchService'
 import { id } from '../../utils/id'
 
@@ -76,6 +76,27 @@ class VectorSerializationModel extends SearchModel<VectorSerializationModel> {
 
   @VectorType({ dimension: 3 })
   embedding?: number[]
+}
+
+// Captures the original-value map seen inside afterSave so tests can assert
+// the change log the hook would build.
+class OriginalValuesModel extends SearchModel<OriginalValuesModel> {
+  static readonly indexName = 'original-values-index'
+
+  @StringType()
+  name!: string
+
+  @NumberType()
+  score!: number
+
+  @StringArrayType()
+  tags?: string[]
+
+  seenOriginalValues: Record<string, unknown> | null = null
+
+  protected async afterSave(): Promise<void> {
+    this.seenOriginalValues = this.getOriginalValues()
+  }
 }
 
 describe('SearchModel', () => {
@@ -634,6 +655,77 @@ describe('SearchModel', () => {
       
       await model.save()
       
+      expect(model['getChangedFields']()).toHaveLength(0)
+    })
+  })
+
+  describe('original value tracking', () => {
+    // The appointment change log reads getOriginalValues() in afterSave to
+    // build from/to diffs, so the original must be the value before the
+    // FIRST change and survive later changes to the same field.
+    it('records the original value and keeps it across multiple changes', () => {
+      const model = new TestModel({ id: id(), name: 'a', version: 1 })
+      model['clearChangedFields']()
+
+      model.name = 'b'
+      model.name = 'c'
+
+      expect(model.getOriginalValues()).toEqual({ name: 'a' })
+    })
+
+    // Reverting a field must clear its dirty state so no bogus change-log
+    // entry is written when a save ends up not changing anything.
+    it('drops a field from changes when reverted to its original value', () => {
+      const model = new TestModel({ id: id(), name: 'a', score: 1, version: 1 })
+      model['clearChangedFields']()
+
+      model.name = 'b'
+      model.score = 2
+      model.name = 'a' // revert
+
+      expect(model['getChangedFields']()).toEqual(['score'])
+      expect(model.getOriginalValues()).toEqual({ score: 1 })
+    })
+
+    // Ryan required getOriginalValues() to return a copy so callers cannot
+    // corrupt the model's own change tracking.
+    it('returns a copy that cannot mutate internal tracking', () => {
+      const model = new TestModel({ id: id(), name: 'a', version: 1 })
+      model['clearChangedFields']()
+      model.name = 'b'
+
+      const snapshot = model.getOriginalValues()
+      snapshot.name = 'tampered'
+      ;(snapshot as Record<string, unknown>).extra = true
+
+      expect(model.getOriginalValues()).toEqual({ name: 'a' })
+    })
+
+    // Provider add/remove is an in-place array mutation; the change log needs
+    // the array as it was before the first mutation.
+    it('records the pre-mutation array on in-place mutation', () => {
+      const model = new OriginalValuesModel({ id: id(), tags: ['a', 'b'], version: 1 })
+      model['clearChangedFields']()
+
+      model.tags!.push('c')
+
+      expect(model.getOriginalValues()).toEqual({ tags: ['a', 'b'] })
+    })
+
+    // The hook contract: original values are visible inside afterSave and
+    // cleared once save completes. version is auto-managed bookkeeping and is
+    // never tracked, so it must not leak into the change log.
+    it('exposes original values in afterSave, excludes version, and clears after save', async () => {
+      const testId = id()
+      mockedSearch.searchRequest.mockResolvedValue({ _id: testId, _version: 2 })
+
+      const model = new OriginalValuesModel({ id: testId, name: 'old', version: 1 })
+      model['clearChangedFields']()
+      model.name = 'new'
+
+      await model.save()
+
+      expect(model.seenOriginalValues).toEqual({ name: 'old' })
       expect(model['getChangedFields']()).toHaveLength(0)
     })
   })

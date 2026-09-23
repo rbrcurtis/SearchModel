@@ -11,8 +11,9 @@ export function createTrackedArray(arr, onMutate) {
             ];
             if (typeof prop === 'string' && mutatingMethods.includes(prop)) {
                 return function (...args) {
+                    const before = [...target];
                     const result = value.apply(target, args);
-                    onMutate();
+                    onMutate(before);
                     return result === target ? proxy : result;
                 };
             }
@@ -20,13 +21,15 @@ export function createTrackedArray(arr, onMutate) {
         },
         set(target, prop, value) {
             if (typeof prop === 'string' && !isNaN(Number(prop))) {
+                const before = [...target];
                 target[prop] = value;
-                onMutate();
+                onMutate(before);
                 return true;
             }
+            const before = [...target];
             target[prop] = value;
             if (prop === 'length' && typeof value === 'number') {
-                onMutate();
+                onMutate(before);
             }
             return true;
         }

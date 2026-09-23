@@ -215,24 +215,22 @@ describe('StringArrayType Persistence', () => {
       expect(changedFields).toHaveLength(2)
     })
 
-    it('should not track changes when setting same array value', () => {
+    it('should not track changes when reassigning an array with equal content', () => {
       const testId = id()
-      const initialArray = ['tag1', 'tag2']
       const model = new TestStringArrayModel({
         id: testId,
-        requiredTags: initialArray
+        requiredTags: ['tag1', 'tag2']
       })
 
       // Clear any initial changes from constructor
       model['clearChangedFields']()
       expect(model['getChangedFields']()).toHaveLength(0)
 
-      // Set the same array reference
-      model.requiredTags = initialArray
+      // Reassign a different array reference with identical content
+      model.requiredTags = ['tag1', 'tag2']
 
-      // With proxy wrapping, reassigning creates a new proxy so this is tracked.
-      // This is acceptable - users should use array mutations instead of reassignment.
-      expect(model['getChangedFields']()).toContain('requiredTags')
+      // Equal content is not a real change, so nothing is tracked
+      expect(model['getChangedFields']()).toHaveLength(0)
     })
 
     it('should track changes when modifying array contents', () => {
