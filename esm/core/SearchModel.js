@@ -391,7 +391,7 @@ export class SearchModel {
         }
         const wait = options.wait ?? false;
         const changedFields = this.getChangedFields();
-        const saveEvent = { updated: changedFields };
+        const saveEvent = { updated: changedFields, meta: options.meta };
         const canSave = await this.beforeSave(saveEvent);
         if (!canSave) {
             logWarn(`[SearchModel.save] Before save hook returned false for ${this.constructor.name} (ID: ${this.id})`);

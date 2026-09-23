@@ -7,11 +7,13 @@ export interface SearchOptions {
 }
 export interface SaveEvent {
     updated: string[];
+    meta?: Record<string, unknown>;
 }
 export interface DeleteEvent {
 }
 export interface SaveOptions {
     wait?: boolean;
+    meta?: Record<string, unknown>;
 }
 export interface DeleteOptions {
     wait?: boolean;
