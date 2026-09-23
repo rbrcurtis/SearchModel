@@ -150,4 +150,17 @@ describe('SearchModel afterSave Integration', () => {
 
     await loaded!.delete()
   })
+
+  // Callers pass request context (who/why) through save({ meta }); the audit
+  // Event feature depends on that context reaching afterSave.
+  it('passes save() meta through to the afterSave event', async () => {
+    const testId = id()
+    const model = new AfterSaveTestModel({ id: testId, name: 'Test' })
+
+    await model.save({ meta: { userId: 'u1', source: 'user' } })
+
+    expect(model.afterSaveEvent!.meta).toEqual({ userId: 'u1', source: 'user' })
+
+    await model.delete()
+  })
 })

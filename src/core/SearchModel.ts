@@ -23,6 +23,10 @@ export interface SearchOptions {
 
 export interface SaveEvent {
   updated: string[]
+  // Caller-supplied context (e.g. who/why), passed through save() to the
+  // lifecycle hooks. Not persisted on this model; hooks decide what to do
+  // with it (for example, writing an audit Event).
+  meta?: Record<string, unknown>
 }
 
 export interface DeleteEvent {
@@ -31,6 +35,7 @@ export interface DeleteEvent {
 
 export interface SaveOptions {
   wait?: boolean
+  meta?: Record<string, unknown>
 }
 
 export interface DeleteOptions {
@@ -595,7 +600,7 @@ export abstract class SearchModel<T extends SearchModel<T>> {
 
     // Get changed fields before lifecycle hooks
     const changedFields = this.getChangedFields()
-    const saveEvent: SaveEvent = { updated: changedFields }
+    const saveEvent: SaveEvent = { updated: changedFields, meta: options.meta }
 
     // Call beforeSave lifecycle hook
     const canSave = await this.beforeSave(saveEvent)
