@@ -236,6 +236,8 @@ export class SearchModel {
     static buildObjectMapping(properties) {
         const mapping = {};
         for (const [propKey, propDef] of Object.entries(properties)) {
+            if (propDef.type === 'stringMap')
+                continue;
             const shouldBeKeyword = /ids?$/i.test(propKey) && propDef.type === 'string';
             if (shouldBeKeyword) {
                 mapping[propKey] = this.getElasticsearchFieldType({

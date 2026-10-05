@@ -370,6 +370,12 @@ export abstract class SearchModel<T extends SearchModel<T>> {
     const mapping: Record<string, any> = {}
 
     for (const [propKey, propDef] of Object.entries(properties)) {
+      // stringMap children are omitted from the mapping for the same reason
+      // top-level stringMap fields are (see generateMapping): the value is an
+      // object, so mapping it as text rejects it at index time. Leaving it out
+      // lets Elasticsearch dynamic auto-mapping index each leaf key on its own.
+      if (propDef.type === 'stringMap') continue
+
       // Auto-convert fields ending with "id" or "ids" to keyword type if they're currently string type
       const shouldBeKeyword =
         /ids?$/i.test(propKey) && propDef.type === 'string'
