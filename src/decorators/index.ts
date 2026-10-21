@@ -1,4 +1,5 @@
 import { createTrackedArray } from '../utils/arrayProxy'
+import { validationFail } from '../errors/ValidationError'
 
 /** Metadata key for storing field type information */
 const FIELD_METADATA_KEY = Symbol('fieldMetadata')
@@ -140,7 +141,7 @@ function validateObjectProperties(
       propOptions.required &&
       (propValue === undefined || propValue === null)
     ) {
-      throw new Error(`Required property '${propPath}' is missing`)
+      throw validationFail(`Required property '${propPath}' is missing`)
     }
 
     if (propValue !== undefined && propValue !== null) {
@@ -180,28 +181,28 @@ export function validateFieldType(
   switch (type) {
     case 'date':
       if (!(value instanceof Date) && typeof value !== 'string') {
-        throw new Error(
+        throw validationFail(
           `Field '${propertyKey}' must be a Date or string, got ${typeof value}`
         )
       }
       if (typeof value === 'string' && isNaN(Date.parse(value))) {
-        throw new Error(`Field '${propertyKey}' must be a valid date string`)
+        throw validationFail(`Field '${propertyKey}' must be a valid date string`)
       }
       break
     case 'dateOnly':
       if (!(value instanceof Date) && typeof value !== 'string') {
-        throw new Error(
+        throw validationFail(
           `Field '${propertyKey}' must be a Date or string, got ${typeof value}`
         )
       }
       if (typeof value === 'string') {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-          throw new Error(
+          throw validationFail(
             `Field '${propertyKey}' must be a valid date string in YYYY-MM-DD format`
           )
         }
         if (isNaN(Date.parse(value))) {
-          throw new Error(
+          throw validationFail(
             `Field '${propertyKey}' must be a valid date string in YYYY-MM-DD format`
           )
         }
@@ -210,34 +211,34 @@ export function validateFieldType(
     case 'string':
     case 'keyword':
       if (typeof value !== 'string') {
-        throw new Error(
+        throw validationFail(
           `Field '${propertyKey}' must be a string, got ${typeof value}`
         )
       }
       break
     case 'number':
       if (typeof value !== 'number' || isNaN(value)) {
-        throw new Error(
+        throw validationFail(
           `Field '${propertyKey}' must be a valid number, got ${typeof value} (${value})`
         )
       }
       break
     case 'boolean':
       if (typeof value !== 'boolean') {
-        throw new Error(
+        throw validationFail(
           `Field '${propertyKey}' must be a boolean, got ${typeof value}`
         )
       }
       break
     case 'stringArray':
       if (!Array.isArray(value)) {
-        throw new Error(
+        throw validationFail(
           `Field '${propertyKey}' must be an array, got ${typeof value}`
         )
       }
       for (let i = 0; i < value.length; i++) {
         if (typeof value[i] !== 'string') {
-          throw new Error(
+          throw validationFail(
             `Field '${propertyKey}' must be an array of strings, found ${typeof value[i]} at index ${i}`
           )
         }
@@ -245,21 +246,21 @@ export function validateFieldType(
       break
     case 'vector': {
       if (!Array.isArray(value)) {
-        throw new Error(
+        throw validationFail(
           `Field '${propertyKey}' must be an array, got ${typeof value}`
         )
       }
 
       const dimension = getVectorDimension(options, propertyKey)
       if (value.length !== dimension) {
-        throw new Error(
+        throw validationFail(
           `Field '${propertyKey}' must have dimension ${dimension}, got ${value.length}`
         )
       }
 
       for (let i = 0; i < value.length; i++) {
         if (typeof value[i] !== 'number' || !Number.isFinite(value[i])) {
-          throw new Error(
+          throw validationFail(
             `Field '${propertyKey}' must be an array of finite numbers, found ${typeof value[i]} at index ${i}`
           )
         }
@@ -268,10 +269,10 @@ export function validateFieldType(
     }
     case 'object':
       if (value === null) {
-        throw new Error(`Field '${propertyKey}' must be an object, got null`)
+        throw validationFail(`Field '${propertyKey}' must be an object, got null`)
       }
       if (typeof value !== 'object' || Array.isArray(value)) {
-        throw new Error(
+        throw validationFail(
           `Field '${propertyKey}' must be an object, got ${Array.isArray(value) ? 'array' : typeof value}`
         )
       }
@@ -281,7 +282,7 @@ export function validateFieldType(
       break
     case 'objectArray':
       if (!Array.isArray(value)) {
-        throw new Error(
+        throw validationFail(
           `Field '${propertyKey}' must be an array, got ${typeof value}`
         )
       }
@@ -293,7 +294,7 @@ export function validateFieldType(
             Array.isArray(item) ||
             item === null
           ) {
-            throw new Error(
+            throw validationFail(
               `Field '${propertyKey}[${i}]' must be an object, got ${typeof item}`
             )
           }
@@ -307,40 +308,40 @@ export function validateFieldType(
       break
     case 'stringMap':
       if (value === null) {
-        throw new Error(`Field '${propertyKey}' must be an object, got null`)
+        throw validationFail(`Field '${propertyKey}' must be an object, got null`)
       }
       if (typeof value !== 'object' || Array.isArray(value)) {
-        throw new Error(
+        throw validationFail(
           `Field '${propertyKey}' must be an object, got ${Array.isArray(value) ? 'array' : typeof value}`
         )
       }
       break
     case 'geoPoint':
       if (value === null) {
-        throw new Error(`Field '${propertyKey}' must be a geo point object, got null`)
+        throw validationFail(`Field '${propertyKey}' must be a geo point object, got null`)
       }
       if (typeof value !== 'object' || Array.isArray(value)) {
-        throw new Error(
+        throw validationFail(
           `Field '${propertyKey}' must be a geo point object with lat/lon, got ${Array.isArray(value) ? 'array' : typeof value}`
         )
       }
       if (typeof value.lat !== 'number' || isNaN(value.lat)) {
-        throw new Error(
+        throw validationFail(
           `Field '${propertyKey}.lat' must be a valid number`
         )
       }
       if (typeof value.lon !== 'number' || isNaN(value.lon)) {
-        throw new Error(
+        throw validationFail(
           `Field '${propertyKey}.lon' must be a valid number`
         )
       }
       if (value.lat < -90 || value.lat > 90) {
-        throw new Error(
+        throw validationFail(
           `Field '${propertyKey}.lat' must be between -90 and 90`
         )
       }
       if (value.lon < -180 || value.lon > 180) {
-        throw new Error(
+        throw validationFail(
           `Field '${propertyKey}.lon' must be between -180 and 180`
         )
       }
@@ -422,7 +423,7 @@ function createValidatedProperty(
 
         // Custom validation
         if (options.validate && !options.validate(value)) {
-          throw new Error(`Field '${propertyKey}' failed custom validation`)
+          throw validationFail(`Field '${propertyKey}' failed custom validation`)
         }
 
         // Wrap arrays with proxy for mutation tracking

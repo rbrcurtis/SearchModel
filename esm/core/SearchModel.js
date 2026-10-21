@@ -11,6 +11,7 @@ import 'reflect-metadata';
 import { search as searchService, SearchError, VersionConflictError, } from './SearchService';
 import { getFieldMetadata, StringType, DateType, NumberType, PRIVATE_STORAGE, } from '../decorators';
 import { id } from '../utils/id';
+import { ValidationError } from '../errors/ValidationError';
 import { logError, logWarn, debug } from '../utils/logging';
 function valuesEqual(a, b) {
     if (a === b)
@@ -375,7 +376,9 @@ export class SearchModel {
         for (const field of fieldMetadata) {
             const value = storage[field.propertyKey] ?? this[field.propertyKey];
             if (field.options?.required && (value === undefined || value === null)) {
-                throw new Error(`Required field '${field.propertyKey}' is missing`);
+                throw new ValidationError({
+                    [field.propertyKey]: `Required field '${field.propertyKey}' is missing`,
+                });
             }
         }
     }
@@ -455,7 +458,7 @@ export class SearchModel {
         }
     }
     async delete(options = {}) {
-        const { wait = false } = options;
+        const { wait = false, meta } = options;
         if (!this.id) {
             throw new Error('Cannot delete document without ID');
         }
@@ -463,7 +466,7 @@ export class SearchModel {
         if (!indexName) {
             throw new Error(`IndexName not defined for ${this.constructor.name}`);
         }
-        const deleteEvent = {};
+        const deleteEvent = { meta };
         await this.beforeDelete(deleteEvent);
         try {
             const refreshParam = wait ? '?refresh=wait_for' : '';

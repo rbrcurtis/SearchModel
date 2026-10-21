@@ -13,6 +13,7 @@ import {
   PRIVATE_STORAGE,
 } from '../decorators'
 import { id } from '../utils/id'
+import { ValidationError } from '../errors/ValidationError'
 import { log, logError, logWarn, debug } from '../utils/logging'
 
 export interface SearchOptions {
@@ -30,7 +31,8 @@ export interface SaveEvent {
 }
 
 export interface DeleteEvent {
-  // Reserved for future expansion
+  /** Caller-supplied context (e.g. the acting user), as on SaveEvent. */
+  meta?: Record<string, unknown>
 }
 
 export interface SaveOptions {
@@ -40,6 +42,8 @@ export interface SaveOptions {
 
 export interface DeleteOptions {
   wait?: boolean
+  /** Passed to `beforeDelete` / `afterDelete` as `event.meta`. */
+  meta?: Record<string, unknown>
 }
 
 // Deep compare for change tracking: === for primitives, element-wise for
@@ -577,7 +581,9 @@ export abstract class SearchModel<T extends SearchModel<T>> {
 
       // Check required fields
       if (field.options?.required && (value === undefined || value === null)) {
-        throw new Error(`Required field '${field.propertyKey}' is missing`)
+        throw new ValidationError({
+          [field.propertyKey]: `Required field '${field.propertyKey}' is missing`,
+        })
       }
     }
   }
@@ -725,7 +731,7 @@ export abstract class SearchModel<T extends SearchModel<T>> {
   }
 
   public async delete(options: DeleteOptions = {}): Promise<void> {
-    const { wait = false } = options
+    const { wait = false, meta } = options
 
     if (!this.id) {
       throw new Error('Cannot delete document without ID')
@@ -736,7 +742,7 @@ export abstract class SearchModel<T extends SearchModel<T>> {
       throw new Error(`IndexName not defined for ${this.constructor.name}`)
     }
 
-    const deleteEvent: DeleteEvent = {}
+    const deleteEvent: DeleteEvent = { meta }
 
     // Call beforeDelete lifecycle hook
     await this.beforeDelete(deleteEvent)

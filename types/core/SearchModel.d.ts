@@ -10,6 +10,7 @@ export interface SaveEvent {
     meta?: Record<string, unknown>;
 }
 export interface DeleteEvent {
+    meta?: Record<string, unknown>;
 }
 export interface SaveOptions {
     wait?: boolean;
@@ -17,6 +18,7 @@ export interface SaveOptions {
 }
 export interface DeleteOptions {
     wait?: boolean;
+    meta?: Record<string, unknown>;
 }
 export declare abstract class SearchModel<T extends SearchModel<T>> {
     static readonly indexName: string;

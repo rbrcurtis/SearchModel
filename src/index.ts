@@ -21,6 +21,9 @@ export {
   validateFieldType
 } from './decorators'
 
+// Error exports
+export { ValidationError, validationFail } from './errors/ValidationError'
+
 // Utility exports
 export { id } from './utils/id'
 export { log, logError, logWarn, debug } from './utils/logging'
