@@ -765,6 +765,40 @@ describe('SearchModel', () => {
     })
   })
 
+  describe('toPlain', () => {
+    it('should return a plain object with the current field values', () => {
+      const testId = id()
+      const birthDate = new Date('2000-01-01T00:00:00.000Z')
+      const model = new TestModel({
+        id: testId,
+        name: 'Test',
+        score: 100,
+        birthDate,
+        isActive: true
+      })
+
+      const plain = model.toPlain()
+
+      expect(Object.getPrototypeOf(plain)).toBe(Object.prototype)
+      expect(plain).toEqual(expect.objectContaining({
+        id: testId,
+        name: 'Test',
+        score: 100,
+        birthDate,
+        isActive: true
+      }))
+      // Dates survive as Date instances for the consumers (e.g. GraphQL scalars)
+      expect(plain.birthDate).toBeInstanceOf(Date)
+    })
+
+    it('should not include undefined fields', () => {
+      const model = new TestModel({ id: id(), name: 'Test' })
+      const plain = model.toPlain()
+      expect(plain).not.toHaveProperty('score')
+      expect(plain).not.toHaveProperty('isActive')
+    })
+  })
+
   describe('toSearch', () => {
     it('should generate Elasticsearch document', () => {
       const testId = id()

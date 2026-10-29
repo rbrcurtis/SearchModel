@@ -483,6 +483,16 @@ export class SearchModel {
     toJSON() {
         return this.redactVectorFields(this.toSearch());
     }
+    toPlain() {
+        const data = {};
+        for (const field of getFieldMetadata(this.constructor.prototype)) {
+            const value = this[field.propertyKey];
+            if (value !== undefined) {
+                data[field.propertyKey] = value;
+            }
+        }
+        return data;
+    }
     redactVectorFields(document) {
         const fieldMetadata = getFieldMetadata(this.constructor.prototype);
         const redacted = { ...document };

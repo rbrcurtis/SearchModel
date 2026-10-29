@@ -772,6 +772,23 @@ export abstract class SearchModel<T extends SearchModel<T>> {
     return this.redactVectorFields(this.toSearch())
   }
 
+  /**
+   * Return the current field values as a plain object (Object.prototype
+   * prototype, no class methods or change tracking). Values are the live
+   * runtime values: Dates stay Dates, nested objects are shared by reference.
+   * Fields with undefined values are omitted.
+   */
+  public toPlain(): T {
+    const data: Record<string, any> = {}
+    for (const field of getFieldMetadata(this.constructor.prototype)) {
+      const value = (this as any)[field.propertyKey]
+      if (value !== undefined) {
+        data[field.propertyKey] = value
+      }
+    }
+    return data as T
+  }
+
   private redactVectorFields(document: Record<string, any>): Record<string, any> {
     const fieldMetadata = getFieldMetadata(this.constructor.prototype)
     const redacted = { ...document }

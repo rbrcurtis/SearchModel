@@ -62,6 +62,7 @@ export declare abstract class SearchModel<T extends SearchModel<T>> {
     save(options?: SaveOptions): Promise<this>;
     delete(options?: DeleteOptions): Promise<void>;
     toJSON(): any;
+    toPlain(): T;
     private redactVectorFields;
     private transformObjectValue;
     private transformFieldValue;
