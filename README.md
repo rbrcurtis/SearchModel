@@ -21,8 +21,8 @@ TypeScript Active Record pattern implementation for Elasticsearch with decorator
 # Install from GitHub
 npm install github:rbrcurtis/SearchModel
 
-# Or with Yarn
-yarn add github:rbrcurtis/SearchModel
+# Or with Yarn or Bun
+bun add github:rbrcurtis/SearchModel
 ```
 
 ## Quick Start

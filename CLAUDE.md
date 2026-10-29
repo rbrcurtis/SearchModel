@@ -3,34 +3,34 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Package Manager
-This project uses **Yarn** as the package manager. Do not use npm.
+This project uses **Bun** as the package manager. Do not use npm/yarn.
 
 ## Common Commands
 
 ### Development
-- `yarn install` - Install dependencies
-- `yarn build` - Build all output formats (CJS, ESM, and TypeScript types)
-- `yarn build:cjs` - Build CommonJS output to `lib/`
-- `yarn build:esm` - Build ES modules output to `esm/`
-- `yarn build:types` - Build TypeScript type definitions to `types/`
-- `yarn clean` - Remove all build artifacts
+- `bun run install` - Install dependencies
+- `bun run build` - Build all output formats (CJS, ESM, and TypeScript types)
+- `bun run build:cjs` - Build CommonJS output to `lib/`
+- `bun run build:esm` - Build ES modules output to `esm/`
+- `bun run build:types` - Build TypeScript type definitions to `types/`
+- `bun run clean` - Remove all build artifacts
 
 ### Testing
-- `yarn test` - Run all tests
-- `yarn test:watch` - Run tests in watch mode
-- `yarn test:coverage` - Run tests with coverage report
-- `yarn test:ui` - Run tests with interactive UI
-- Run single test file: `yarn test <path-to-test-file>`
-  - Example: `yarn test src/core/__tests__/SearchModel.test.ts`
-- Run tests matching pattern: `yarn test -t "<test-name-pattern>"`
-  - Example: `yarn test -t "should create a new document"`
+- `bun run test` - Run all tests
+- `bun run test:watch` - Run tests in watch mode
+- `bun run test:coverage` - Run tests with coverage report
+- `bun run test:ui` - Run tests with interactive UI
+- Run single test file: `bun run test <path-to-test-file>`
+  - Example: `bun run test src/core/__tests__/SearchModel.test.ts`
+- Run tests matching pattern: `bun run test -t "<test-name-pattern>"`
+  - Example: `bun run test -t "should create a new document"`
 
 ### Code Quality
-- `yarn lint` - Run ESLint
-- `yarn format` - Format code with Prettier
+- `bun run lint` - Run ESLint
+- `bun run format` - Format code with Prettier
 
 ## Pre-commit Hook
-The project has a Husky pre-commit hook that runs `yarn build && yarn test` before each commit to ensure the code compiles successfully and all tests pass.
+The project has a Husky pre-commit hook that runs `bun run build && bun run test` before each commit to ensure the code compiles successfully and all tests pass.
 
 ## Architecture Overview
 
@@ -357,6 +357,6 @@ sections!: Array<{
 - Decorator changes require careful testing due to metadata reflection
 
 ### Build Process
-- `prebuild` script automatically runs `yarn clean` before builds
+- `prebuild` script automatically runs `bun run clean` before builds
 - All three output formats must build successfully for commit to pass
 - Type definitions are generated separately and must match runtime behavior
