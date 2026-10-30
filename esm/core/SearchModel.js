@@ -65,14 +65,14 @@ function stringifyMapLeaves(value) {
 }
 export class SearchModel {
     markFieldChanged(fieldName) {
-        if (fieldName === 'version')
+        if (['createdAt', 'updatedAt', 'version'].includes(fieldName))
             return;
         if (!this._changedFields.has(fieldName)) {
             this._changedFields.set(fieldName, undefined);
         }
     }
     recordFieldChange(fieldName, next, prev) {
-        if (fieldName === 'version')
+        if (['createdAt', 'updatedAt', 'version'].includes(fieldName))
             return;
         if (valuesEqual(next, prev))
             return;
@@ -395,6 +395,14 @@ export class SearchModel {
             throw new Error(`IndexName not defined for ${this.constructor.name}`);
         }
         const wait = options.wait ?? false;
+        const createOnly = options.createOnly ?? false;
+        const expectedVersion = options.expectedVersion;
+        if (createOnly && !this._isNewDocument) {
+            throw new Error('createOnly can only be used for new documents');
+        }
+        if (expectedVersion && this._isNewDocument) {
+            throw new Error('expectedVersion can only be used for existing documents');
+        }
         const changedFields = this.getChangedFields();
         const saveEvent = { updated: changedFields, meta: options.meta };
         const canSave = await this.beforeSave(saveEvent);
@@ -432,8 +440,14 @@ export class SearchModel {
         });
         try {
             const refreshParam = wait ? '?refresh=wait_for' : '';
-            const url = `/${indexName}/_doc/${this.id}${refreshParam}`;
-            const result = await searchService.searchRequest('PUT', url, document);
+            const operation = createOnly ? '_create' : '_doc';
+            const url = `/${indexName}/${operation}/${this.id}${refreshParam}`;
+            const result = expectedVersion
+                ? await searchService.searchRequest('PUT', url, document, {
+                    version: expectedVersion,
+                    versionType: 'internal',
+                })
+                : await searchService.searchRequest('PUT', url, document);
             if (result && result._version) {
                 this.version = result._version;
                 debug('search', `[SearchModel.save] Updated version from ES response: ${result._version}`);
@@ -458,7 +472,7 @@ export class SearchModel {
         }
     }
     async delete(options = {}) {
-        const { wait = false, meta } = options;
+        const { wait = false, requireFound = false, expectedVersion, meta } = options;
         if (!this.id) {
             throw new Error('Cannot delete document without ID');
         }
@@ -470,7 +484,12 @@ export class SearchModel {
         await this.beforeDelete(deleteEvent);
         try {
             const refreshParam = wait ? '?refresh=wait_for' : '';
-            await searchService.searchRequest('DELETE', `/${indexName}/_doc/${this.id}${refreshParam}`);
+            const result = expectedVersion
+                ? await searchService.searchRequest('DELETE', `/${indexName}/_doc/${this.id}${refreshParam}`, undefined, { version: expectedVersion, versionType: 'internal' })
+                : await searchService.searchRequest('DELETE', `/${indexName}/_doc/${this.id}${refreshParam}`);
+            if (requireFound && result?.result !== 'deleted') {
+                throw new Error(`${this.constructor.name} ${this.id} was not found for deletion`);
+            }
             await this.afterDelete(deleteEvent);
         }
         catch (error) {

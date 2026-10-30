@@ -14,10 +14,14 @@ export interface DeleteEvent {
 }
 export interface SaveOptions {
     wait?: boolean;
+    createOnly?: boolean;
+    expectedVersion?: number;
     meta?: Record<string, unknown>;
 }
 export interface DeleteOptions {
     wait?: boolean;
+    requireFound?: boolean;
+    expectedVersion?: number;
     meta?: Record<string, unknown>;
 }
 export declare abstract class SearchModel<T extends SearchModel<T>> {

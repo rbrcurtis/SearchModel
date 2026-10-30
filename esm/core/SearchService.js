@@ -147,7 +147,8 @@ class SearchService {
         let fullPath = path;
         if (options?.version) {
             const separator = path.includes('?') ? '&' : '?';
-            fullPath = `${path}${separator}version=${options.version}&version_type=external`;
+            const versionType = options.versionType || 'external';
+            fullPath = `${path}${separator}version=${options.version}&version_type=${versionType}`;
         }
         return this.executeRequest(method, fullPath, data);
     }
@@ -232,6 +233,7 @@ class SearchService {
                 return ModelClass.fromJSON({
                     id: response._id,
                     ...response._source,
+                    version: response._version ?? response._source?.version,
                 });
             }
             return null;

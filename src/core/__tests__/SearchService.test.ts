@@ -286,7 +286,8 @@ describe('SearchService', () => {
         json: async () => ({
           found: true,
           _id: testId,
-          _source: { name: 'Test Document' }
+          _version: 7,
+          _source: { name: 'Test Document', version: 2 }
         })
       })
 
@@ -295,6 +296,7 @@ describe('SearchService', () => {
       expect(result).toBeInstanceOf(TestModel)
       expect((result as any).data.id).toBe(testId)
       expect((result as any).data.name).toBe('Test Document')
+      expect((result as any).data.version).toBe(7)
     })
 
     it('should return null when document not found', async () => {

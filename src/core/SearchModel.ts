@@ -37,11 +37,15 @@ export interface DeleteEvent {
 
 export interface SaveOptions {
   wait?: boolean
+  createOnly?: boolean
+  expectedVersion?: number
   meta?: Record<string, unknown>
 }
 
 export interface DeleteOptions {
   wait?: boolean
+  requireFound?: boolean
+  expectedVersion?: number
   /** Passed to `beforeDelete` / `afterDelete` as `event.meta`. */
   meta?: Record<string, unknown>
 }
@@ -129,7 +133,7 @@ export abstract class SearchModel<T extends SearchModel<T>> {
    * unknown (undefined) original value.
    */
   protected markFieldChanged(fieldName: string): void {
-    if (fieldName === 'version') return
+    if (['createdAt', 'updatedAt', 'version'].includes(fieldName)) return
     if (!this._changedFields.has(fieldName)) {
       this._changedFields.set(fieldName, undefined)
     }
@@ -143,9 +147,7 @@ export abstract class SearchModel<T extends SearchModel<T>> {
    *   no longer considered dirty.
    */
   protected recordFieldChange(fieldName: string, next: unknown, prev: unknown): void {
-    // version is auto-managed bookkeeping (bumped on every save), not user
-    // data, so it never counts as a tracked change.
-    if (fieldName === 'version') return
+    if (['createdAt', 'updatedAt', 'version'].includes(fieldName)) return
     if (valuesEqual(next, prev)) return
     if (this._changedFields.has(fieldName)) {
       if (valuesEqual(this._changedFields.get(fieldName), next)) {
@@ -609,6 +611,15 @@ export abstract class SearchModel<T extends SearchModel<T>> {
 
     // Default wait to false for performance
     const wait = options.wait ?? false
+    const createOnly = options.createOnly ?? false
+    const expectedVersion = options.expectedVersion
+
+    if (createOnly && !this._isNewDocument) {
+      throw new Error('createOnly can only be used for new documents')
+    }
+    if (expectedVersion && this._isNewDocument) {
+      throw new Error('expectedVersion can only be used for existing documents')
+    }
 
     // Get changed fields before lifecycle hooks
     const changedFields = this.getChangedFields()
@@ -676,15 +687,15 @@ export abstract class SearchModel<T extends SearchModel<T>> {
     try {
       // Build the URL with optional refresh parameter
       const refreshParam = wait ? '?refresh=wait_for' : ''
-      const url = `/${indexName}/_doc/${this.id}${refreshParam}`
+      const operation = createOnly ? '_create' : '_doc'
+      const url = `/${indexName}/${operation}/${this.id}${refreshParam}`
 
-      const result = await searchService.searchRequest(
-        'PUT',
-        url,
-        document
-        // Temporarily disable version checking to get system working
-        // { version: this._isNewDocument ? undefined : this.version }
-      )
+      const result = expectedVersion
+        ? await searchService.searchRequest('PUT', url, document, {
+            version: expectedVersion,
+            versionType: 'internal',
+          })
+        : await searchService.searchRequest('PUT', url, document)
 
       // If ES returned a version, update our version to match
       if (result && result._version) {
@@ -731,7 +742,7 @@ export abstract class SearchModel<T extends SearchModel<T>> {
   }
 
   public async delete(options: DeleteOptions = {}): Promise<void> {
-    const { wait = false, meta } = options
+    const { wait = false, requireFound = false, expectedVersion, meta } = options
 
     if (!this.id) {
       throw new Error('Cannot delete document without ID')
@@ -750,10 +761,21 @@ export abstract class SearchModel<T extends SearchModel<T>> {
     try {
       const refreshParam = wait ? '?refresh=wait_for' : ''
 
-      await searchService.searchRequest(
-        'DELETE',
-        `/${indexName}/_doc/${this.id}${refreshParam}`
-      )
+      const result = expectedVersion
+        ? await searchService.searchRequest(
+            'DELETE',
+            `/${indexName}/_doc/${this.id}${refreshParam}`,
+            undefined,
+            { version: expectedVersion, versionType: 'internal' }
+          )
+        : await searchService.searchRequest(
+            'DELETE',
+            `/${indexName}/_doc/${this.id}${refreshParam}`
+          )
+
+      if (requireFound && result?.result !== 'deleted') {
+        throw new Error(`${this.constructor.name} ${this.id} was not found for deletion`)
+      }
 
       // Call afterDelete lifecycle hook
       await this.afterDelete(deleteEvent)

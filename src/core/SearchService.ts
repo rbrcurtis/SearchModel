@@ -229,14 +229,13 @@ class SearchService {
     method: string,
     path: string,
     data?: any,
-    options?: { version?: number }
+    options?: { version?: number; versionType?: 'external' | 'internal' }
   ): Promise<any> {
-    // Add version parameters to URL if provided for optimistic locking
     let fullPath = path
     if (options?.version) {
       const separator = path.includes('?') ? '&' : '?'
-      // Use external version type for proper version management
-      fullPath = `${path}${separator}version=${options.version}&version_type=external`
+      const versionType = options.versionType || 'external'
+      fullPath = `${path}${separator}version=${options.version}&version_type=${versionType}`
     }
 
     return this.executeRequest(method, fullPath, data)
@@ -364,6 +363,7 @@ class SearchService {
         return (ModelClass as any).fromJSON({
           id: response._id,
           ...response._source,
+          version: response._version ?? response._source?.version,
         })
       }
       return null

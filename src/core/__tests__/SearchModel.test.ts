@@ -331,6 +331,61 @@ describe('SearchModel', () => {
       expect(result).toBe(model)
     })
 
+    it('should create a document without overwriting an existing id when requested', async () => {
+      const testId = id()
+      mockedSearch.searchRequest.mockResolvedValue({
+        _id: testId,
+        _version: 1
+      })
+
+      const model = new TestModel({ id: testId, name: 'Test' })
+      await model.save({ createOnly: true, wait: true })
+
+      expect(search.searchRequest).toHaveBeenCalledWith(
+        'PUT',
+        `/test-index/_create/${testId}?refresh=wait_for`,
+        expect.objectContaining({ id: testId, name: 'Test' })
+      )
+    })
+
+    it('should reject createOnly for a loaded document', async () => {
+      const model = new TestModel({
+        id: id(),
+        name: 'Test',
+        version: 2,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      })
+
+      await expect(model.save({ createOnly: true })).rejects.toThrow(
+        'createOnly can only be used for new documents'
+      )
+    })
+
+    it('should save only the expected document version', async () => {
+      const testId = id()
+      mockedSearch.searchRequest.mockResolvedValue({
+        _id: testId,
+        _version: 8
+      })
+
+      const model = new TestModel({
+        id: testId,
+        name: 'Test',
+        version: 7,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      })
+      await model.save({ expectedVersion: model.version })
+
+      expect(search.searchRequest).toHaveBeenCalledWith(
+        'PUT',
+        `/test-index/_doc/${testId}`,
+        expect.objectContaining({ id: testId, name: 'Test' }),
+        { version: 7, versionType: 'internal' }
+      )
+    })
+
     it('should update existing document', async () => {
       const testId = id()
       mockedSearch.searchRequest.mockResolvedValue({
@@ -467,10 +522,44 @@ describe('SearchModel', () => {
       )
     })
 
+    it('should delete only the expected document version', async () => {
+      const testId = id()
+      mockedSearch.searchRequest.mockResolvedValue({ result: 'deleted' })
+
+      const model = new TestModel({ id: testId, name: 'Test', version: 7 })
+      await model.delete({ expectedVersion: model.version })
+
+      expect(search.searchRequest).toHaveBeenCalledWith(
+        'DELETE',
+        `/test-index/_doc/${testId}`,
+        undefined,
+        { version: 7, versionType: 'internal' }
+      )
+    })
+
+    it('should require the document to exist when requested', async () => {
+      const testId = id()
+      mockedSearch.searchRequest.mockResolvedValue({ result: 'not_found' })
+
+      const model = new TestModel({ id: testId, name: 'Test' })
+
+      await expect(model.delete({ requireFound: true })).rejects.toThrow(
+        `TestModel ${testId} was not found for deletion`
+      )
+    })
+
+    it('should accept a confirmed deletion when existence is required', async () => {
+      const testId = id()
+      mockedSearch.searchRequest.mockResolvedValue({ result: 'deleted' })
+
+      const model = new TestModel({ id: testId, name: 'Test' })
+      await expect(model.delete({ requireFound: true })).resolves.toBeUndefined()
+    })
+
     it('should throw error when id is missing', async () => {
       const model = new TestModel()
       model.id = undefined as any
-      
+
       await expect(model.delete()).rejects.toThrow('Cannot delete document without ID')
     })
 
