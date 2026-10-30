@@ -129,12 +129,7 @@ class SearchService {
       if (!response.ok) {
         const errorBody = await response.text()
 
-        // Check for version conflict errors
-        if (
-          response.status === 409 &&
-          errorBody.includes('version_conflict_engine_exception')
-        ) {
-          // Parse the error to extract version information if available
+        if (response.status === 409) {
           let currentVersion: number | undefined
           let attemptedVersion: number | undefined
 
@@ -142,7 +137,6 @@ class SearchService {
             const errorData = JSON.parse(errorBody)
             const error = errorData.error
             if (error && error.reason) {
-              // Extract version numbers from error message if present
               const versionMatch = error.reason.match(
                 /current version \[(\d+)\].*version \[(\d+)\]/
               )
@@ -151,8 +145,7 @@ class SearchService {
                 attemptedVersion = parseInt(versionMatch[2], 10)
               }
             }
-          } catch (e) {
-            // Failed to parse error body, continue with generic version conflict
+          } catch {
           }
 
           throw new VersionConflictError(

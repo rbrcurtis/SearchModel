@@ -145,6 +145,19 @@ describe('SearchService', () => {
       ).rejects.toThrow(VersionConflictError)
     })
 
+    it('should classify every HTTP 409 as a version conflict', async () => {
+      ;(global.fetch as Mock).mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        statusText: 'Conflict',
+        text: async () => JSON.stringify({ error: { type: 'document_already_exists_exception' } })
+      })
+
+      await expect(
+        search.searchRequest('PUT', '/test-index/_create/123', {})
+      ).rejects.toThrow(VersionConflictError)
+    })
+
     it('should retry on rate limit (429)', async () => {
       ;(global.fetch as Mock)
         .mockResolvedValueOnce({

@@ -794,6 +794,7 @@ export abstract class SearchModel<T extends SearchModel<T>> {
       await this.afterDelete(deleteEvent)
     } catch (error) {
       if (error instanceof SearchError) {
+        if (error.statusCode === 404 && !requireFound) return
         throw new Error(
           `Failed to delete ${this.constructor.name}: ${error.message}`
         )

@@ -547,6 +547,15 @@ describe('SearchModel', () => {
       )
     })
 
+    it('should treat a missing document as already deleted by default', async () => {
+      const testId = id()
+      mockedSearch.searchRequest.mockRejectedValue(new SearchError('Not found', 404))
+
+      const model = new TestModel({ id: testId, name: 'Test' })
+
+      await expect(model.delete()).resolves.toBeUndefined()
+    })
+
     it('should require the document to exist when requested', async () => {
       const testId = id()
       mockedSearch.searchRequest.mockResolvedValue({ result: 'not_found' })

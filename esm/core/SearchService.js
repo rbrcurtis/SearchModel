@@ -80,8 +80,7 @@ class SearchService {
             }
             if (!response.ok) {
                 const errorBody = await response.text();
-                if (response.status === 409 &&
-                    errorBody.includes('version_conflict_engine_exception')) {
+                if (response.status === 409) {
                     let currentVersion;
                     let attemptedVersion;
                     try {
@@ -95,7 +94,7 @@ class SearchService {
                             }
                         }
                     }
-                    catch (e) {
+                    catch {
                     }
                     throw new VersionConflictError('Document version conflict: another process has modified this document', currentVersion, attemptedVersion);
                 }

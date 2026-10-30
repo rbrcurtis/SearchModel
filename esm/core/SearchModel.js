@@ -504,6 +504,8 @@ export class SearchModel {
         }
         catch (error) {
             if (error instanceof SearchError) {
+                if (error.statusCode === 404 && !requireFound)
+                    return;
                 throw new Error(`Failed to delete ${this.constructor.name}: ${error.message}`);
             }
             throw error;
