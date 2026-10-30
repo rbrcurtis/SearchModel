@@ -80,8 +80,7 @@ class SearchService {
             }
             if (!response.ok) {
                 const errorBody = await response.text();
-                if (response.status === 409 &&
-                    errorBody.includes('version_conflict_engine_exception')) {
+                if (response.status === 409) {
                     let currentVersion;
                     let attemptedVersion;
                     try {
@@ -95,7 +94,7 @@ class SearchService {
                             }
                         }
                     }
-                    catch (e) {
+                    catch {
                     }
                     throw new VersionConflictError('Document version conflict: another process has modified this document', currentVersion, attemptedVersion);
                 }
@@ -146,8 +145,12 @@ class SearchService {
     async searchRequest(method, path, data, options) {
         let fullPath = path;
         if (options?.version) {
-            const separator = path.includes('?') ? '&' : '?';
-            fullPath = `${path}${separator}version=${options.version}&version_type=external`;
+            const separator = fullPath.includes('?') ? '&' : '?';
+            fullPath = `${fullPath}${separator}version=${options.version}&version_type=external`;
+        }
+        if (options?.ifSeqNo !== undefined && options.ifPrimaryTerm !== undefined) {
+            const separator = fullPath.includes('?') ? '&' : '?';
+            fullPath = `${fullPath}${separator}if_seq_no=${options.ifSeqNo}&if_primary_term=${options.ifPrimaryTerm}`;
         }
         return this.executeRequest(method, fullPath, data);
     }
@@ -232,6 +235,9 @@ class SearchService {
                 return ModelClass.fromJSON({
                     id: response._id,
                     ...response._source,
+                    version: response._version ?? response._source?.version,
+                    _sequenceNumber: response._seq_no,
+                    _primaryTerm: response._primary_term,
                 });
             }
             return null;

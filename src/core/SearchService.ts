@@ -129,12 +129,7 @@ class SearchService {
       if (!response.ok) {
         const errorBody = await response.text()
 
-        // Check for version conflict errors
-        if (
-          response.status === 409 &&
-          errorBody.includes('version_conflict_engine_exception')
-        ) {
-          // Parse the error to extract version information if available
+        if (response.status === 409) {
           let currentVersion: number | undefined
           let attemptedVersion: number | undefined
 
@@ -142,7 +137,6 @@ class SearchService {
             const errorData = JSON.parse(errorBody)
             const error = errorData.error
             if (error && error.reason) {
-              // Extract version numbers from error message if present
               const versionMatch = error.reason.match(
                 /current version \[(\d+)\].*version \[(\d+)\]/
               )
@@ -151,8 +145,7 @@ class SearchService {
                 attemptedVersion = parseInt(versionMatch[2], 10)
               }
             }
-          } catch (e) {
-            // Failed to parse error body, continue with generic version conflict
+          } catch {
           }
 
           throw new VersionConflictError(
@@ -229,14 +222,16 @@ class SearchService {
     method: string,
     path: string,
     data?: any,
-    options?: { version?: number }
+    options?: { version?: number; ifSeqNo?: number; ifPrimaryTerm?: number }
   ): Promise<any> {
-    // Add version parameters to URL if provided for optimistic locking
     let fullPath = path
     if (options?.version) {
-      const separator = path.includes('?') ? '&' : '?'
-      // Use external version type for proper version management
-      fullPath = `${path}${separator}version=${options.version}&version_type=external`
+      const separator = fullPath.includes('?') ? '&' : '?'
+      fullPath = `${fullPath}${separator}version=${options.version}&version_type=external`
+    }
+    if (options?.ifSeqNo !== undefined && options.ifPrimaryTerm !== undefined) {
+      const separator = fullPath.includes('?') ? '&' : '?'
+      fullPath = `${fullPath}${separator}if_seq_no=${options.ifSeqNo}&if_primary_term=${options.ifPrimaryTerm}`
     }
 
     return this.executeRequest(method, fullPath, data)
@@ -364,6 +359,9 @@ class SearchService {
         return (ModelClass as any).fromJSON({
           id: response._id,
           ...response._source,
+          version: response._version ?? response._source?.version,
+          _sequenceNumber: response._seq_no,
+          _primaryTerm: response._primary_term,
         })
       }
       return null

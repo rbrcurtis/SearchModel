@@ -18,6 +18,8 @@ declare class SearchService {
     private executeRequest;
     searchRequest(method: string, path: string, data?: any, options?: {
         version?: number;
+        ifSeqNo?: number;
+        ifPrimaryTerm?: number;
     }): Promise<any>;
     query<T extends any>(ModelClass: string | ((new (data?: Partial<T>) => T) & {
         indexName: string;

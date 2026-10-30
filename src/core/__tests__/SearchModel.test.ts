@@ -331,6 +331,65 @@ describe('SearchModel', () => {
       expect(result).toBe(model)
     })
 
+    it('should create a document without overwriting an existing id when requested', async () => {
+      const testId = id()
+      mockedSearch.searchRequest.mockResolvedValue({
+        _id: testId,
+        _version: 1
+      })
+
+      const model = new TestModel({ id: testId, name: 'Test' })
+      await model.save({ createOnly: true, wait: true })
+
+      expect(search.searchRequest).toHaveBeenCalledWith(
+        'PUT',
+        `/test-index/_create/${testId}?refresh=wait_for`,
+        expect.objectContaining({ id: testId, name: 'Test' })
+      )
+    })
+
+    it('should reject createOnly for a loaded document', async () => {
+      const model = new TestModel({
+        id: id(),
+        name: 'Test',
+        version: 2,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      })
+
+      await expect(model.save({ createOnly: true })).rejects.toThrow(
+        'createOnly can only be used for new documents'
+      )
+    })
+
+    it('should save atomically with loaded sequence metadata', async () => {
+      const testId = id()
+      mockedSearch.searchRequest.mockResolvedValue({
+        _id: testId,
+        _version: 8,
+        _seq_no: 13,
+        _primary_term: 3
+      })
+
+      const model = TestModel.fromJSON({
+        id: testId,
+        name: 'Test',
+        version: 7,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        _sequenceNumber: 12,
+        _primaryTerm: 3
+      } as never)
+      await model.save({ atomic: true })
+
+      expect(search.searchRequest).toHaveBeenCalledWith(
+        'PUT',
+        `/test-index/_doc/${testId}`,
+        expect.objectContaining({ id: testId, name: 'Test' }),
+        { ifSeqNo: 12, ifPrimaryTerm: 3 }
+      )
+    })
+
     it('should update existing document', async () => {
       const testId = id()
       mockedSearch.searchRequest.mockResolvedValue({
@@ -467,10 +526,59 @@ describe('SearchModel', () => {
       )
     })
 
+    it('should delete atomically with loaded sequence metadata', async () => {
+      const testId = id()
+      mockedSearch.searchRequest.mockResolvedValue({ result: 'deleted' })
+
+      const model = TestModel.fromJSON({
+        id: testId,
+        name: 'Test',
+        version: 7,
+        _sequenceNumber: 12,
+        _primaryTerm: 3
+      } as never)
+      await model.delete({ atomic: true })
+
+      expect(search.searchRequest).toHaveBeenCalledWith(
+        'DELETE',
+        `/test-index/_doc/${testId}`,
+        undefined,
+        { ifSeqNo: 12, ifPrimaryTerm: 3 }
+      )
+    })
+
+    it('should treat a missing document as already deleted by default', async () => {
+      const testId = id()
+      mockedSearch.searchRequest.mockRejectedValue(new SearchError('Not found', 404))
+
+      const model = new TestModel({ id: testId, name: 'Test' })
+
+      await expect(model.delete()).resolves.toBeUndefined()
+    })
+
+    it('should require the document to exist when requested', async () => {
+      const testId = id()
+      mockedSearch.searchRequest.mockResolvedValue({ result: 'not_found' })
+
+      const model = new TestModel({ id: testId, name: 'Test' })
+
+      await expect(model.delete({ requireFound: true })).rejects.toThrow(
+        `TestModel ${testId} was not found for deletion`
+      )
+    })
+
+    it('should accept a confirmed deletion when existence is required', async () => {
+      const testId = id()
+      mockedSearch.searchRequest.mockResolvedValue({ result: 'deleted' })
+
+      const model = new TestModel({ id: testId, name: 'Test' })
+      await expect(model.delete({ requireFound: true })).resolves.toBeUndefined()
+    })
+
     it('should throw error when id is missing', async () => {
       const model = new TestModel()
       model.id = undefined as any
-      
+
       await expect(model.delete()).rejects.toThrow('Cannot delete document without ID')
     })
 

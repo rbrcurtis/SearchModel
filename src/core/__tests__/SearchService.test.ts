@@ -94,6 +94,24 @@ describe('SearchService', () => {
       )
     })
 
+    it('should add sequence parameters when provided', async () => {
+      ;(global.fetch as Mock).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({})
+      })
+
+      await search.searchRequest('PUT', '/test-index/_doc/123?refresh=wait_for', {}, {
+        ifSeqNo: 12,
+        ifPrimaryTerm: 3
+      })
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://localhost:9200/test-index/_doc/123?refresh=wait_for&if_seq_no=12&if_primary_term=3',
+        expect.any(Object)
+      )
+    })
+
     it('should handle 404 errors', async () => {
       ;(global.fetch as Mock).mockResolvedValueOnce({
         ok: false,
@@ -124,6 +142,19 @@ describe('SearchService', () => {
 
       await expect(
         search.searchRequest('PUT', '/test-index/_doc/123', {})
+      ).rejects.toThrow(VersionConflictError)
+    })
+
+    it('should classify every HTTP 409 as a version conflict', async () => {
+      ;(global.fetch as Mock).mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        statusText: 'Conflict',
+        text: async () => JSON.stringify({ error: { type: 'document_already_exists_exception' } })
+      })
+
+      await expect(
+        search.searchRequest('PUT', '/test-index/_create/123', {})
       ).rejects.toThrow(VersionConflictError)
     })
 
@@ -286,7 +317,10 @@ describe('SearchService', () => {
         json: async () => ({
           found: true,
           _id: testId,
-          _source: { name: 'Test Document' }
+          _version: 7,
+          _seq_no: 12,
+          _primary_term: 3,
+          _source: { name: 'Test Document', version: 2 }
         })
       })
 
@@ -295,6 +329,9 @@ describe('SearchService', () => {
       expect(result).toBeInstanceOf(TestModel)
       expect((result as any).data.id).toBe(testId)
       expect((result as any).data.name).toBe('Test Document')
+      expect((result as any).data.version).toBe(7)
+      expect((result as any).data._sequenceNumber).toBe(12)
+      expect((result as any).data._primaryTerm).toBe(3)
     })
 
     it('should return null when document not found', async () => {
