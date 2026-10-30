@@ -15,19 +15,21 @@ export interface DeleteEvent {
 export interface SaveOptions {
     wait?: boolean;
     createOnly?: boolean;
-    expectedVersion?: number;
+    atomic?: boolean;
     meta?: Record<string, unknown>;
 }
 export interface DeleteOptions {
     wait?: boolean;
     requireFound?: boolean;
-    expectedVersion?: number;
+    atomic?: boolean;
     meta?: Record<string, unknown>;
 }
 export declare abstract class SearchModel<T extends SearchModel<T>> {
     static readonly indexName: string;
     private _changedFields;
     private _isNewDocument;
+    private _sequenceNumber?;
+    private _primaryTerm?;
     id: string;
     createdAt: Date;
     updatedAt: Date;

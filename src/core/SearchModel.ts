@@ -38,14 +38,14 @@ export interface DeleteEvent {
 export interface SaveOptions {
   wait?: boolean
   createOnly?: boolean
-  expectedVersion?: number
+  atomic?: boolean
   meta?: Record<string, unknown>
 }
 
 export interface DeleteOptions {
   wait?: boolean
   requireFound?: boolean
-  expectedVersion?: number
+  atomic?: boolean
   /** Passed to `beforeDelete` / `afterDelete` as `event.meta`. */
   meta?: Record<string, unknown>
 }
@@ -110,6 +110,10 @@ export abstract class SearchModel<T extends SearchModel<T>> {
 
   // Track if this is a new document that hasn't been saved yet
   private _isNewDocument: boolean = true
+
+  // Elasticsearch optimistic concurrency metadata loaded by getById()
+  private _sequenceNumber?: number
+  private _primaryTerm?: number
 
   // Instance properties with decorators
   @StringType({ required: true, default: () => id() })
@@ -612,13 +616,16 @@ export abstract class SearchModel<T extends SearchModel<T>> {
     // Default wait to false for performance
     const wait = options.wait ?? false
     const createOnly = options.createOnly ?? false
-    const expectedVersion = options.expectedVersion
+    const atomic = options.atomic ?? false
 
     if (createOnly && !this._isNewDocument) {
       throw new Error('createOnly can only be used for new documents')
     }
-    if (expectedVersion && this._isNewDocument) {
-      throw new Error('expectedVersion can only be used for existing documents')
+    if (atomic && this._isNewDocument) {
+      throw new Error('atomic save can only be used for existing documents')
+    }
+    if (atomic && (this._sequenceNumber === undefined || this._primaryTerm === undefined)) {
+      throw new Error('atomic save requires a document loaded by getById')
     }
 
     // Get changed fields before lifecycle hooks
@@ -690,12 +697,15 @@ export abstract class SearchModel<T extends SearchModel<T>> {
       const operation = createOnly ? '_create' : '_doc'
       const url = `/${indexName}/${operation}/${this.id}${refreshParam}`
 
-      const result = expectedVersion
+      const result = atomic
         ? await searchService.searchRequest('PUT', url, document, {
-            version: expectedVersion,
-            versionType: 'internal',
+            ifSeqNo: this._sequenceNumber,
+            ifPrimaryTerm: this._primaryTerm,
           })
         : await searchService.searchRequest('PUT', url, document)
+
+      if (result?._seq_no !== undefined) this._sequenceNumber = result._seq_no
+      if (result?._primary_term !== undefined) this._primaryTerm = result._primary_term
 
       // If ES returned a version, update our version to match
       if (result && result._version) {
@@ -742,10 +752,13 @@ export abstract class SearchModel<T extends SearchModel<T>> {
   }
 
   public async delete(options: DeleteOptions = {}): Promise<void> {
-    const { wait = false, requireFound = false, expectedVersion, meta } = options
+    const { wait = false, requireFound = false, atomic = false, meta } = options
 
     if (!this.id) {
       throw new Error('Cannot delete document without ID')
+    }
+    if (atomic && (this._sequenceNumber === undefined || this._primaryTerm === undefined)) {
+      throw new Error('atomic delete requires a document loaded by getById')
     }
 
     const indexName = (this.constructor as any).indexName
@@ -761,12 +774,12 @@ export abstract class SearchModel<T extends SearchModel<T>> {
     try {
       const refreshParam = wait ? '?refresh=wait_for' : ''
 
-      const result = expectedVersion
+      const result = atomic
         ? await searchService.searchRequest(
             'DELETE',
             `/${indexName}/_doc/${this.id}${refreshParam}`,
             undefined,
-            { version: expectedVersion, versionType: 'internal' }
+            { ifSeqNo: this._sequenceNumber, ifPrimaryTerm: this._primaryTerm }
           )
         : await searchService.searchRequest(
             'DELETE',

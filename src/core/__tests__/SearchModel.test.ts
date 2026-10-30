@@ -362,27 +362,31 @@ describe('SearchModel', () => {
       )
     })
 
-    it('should save only the expected document version', async () => {
+    it('should save atomically with loaded sequence metadata', async () => {
       const testId = id()
       mockedSearch.searchRequest.mockResolvedValue({
         _id: testId,
-        _version: 8
+        _version: 8,
+        _seq_no: 13,
+        _primary_term: 3
       })
 
-      const model = new TestModel({
+      const model = TestModel.fromJSON({
         id: testId,
         name: 'Test',
         version: 7,
         createdAt: new Date(),
-        updatedAt: new Date()
-      })
-      await model.save({ expectedVersion: model.version })
+        updatedAt: new Date(),
+        _sequenceNumber: 12,
+        _primaryTerm: 3
+      } as never)
+      await model.save({ atomic: true })
 
       expect(search.searchRequest).toHaveBeenCalledWith(
         'PUT',
         `/test-index/_doc/${testId}`,
         expect.objectContaining({ id: testId, name: 'Test' }),
-        { version: 7, versionType: 'internal' }
+        { ifSeqNo: 12, ifPrimaryTerm: 3 }
       )
     })
 
@@ -522,18 +526,24 @@ describe('SearchModel', () => {
       )
     })
 
-    it('should delete only the expected document version', async () => {
+    it('should delete atomically with loaded sequence metadata', async () => {
       const testId = id()
       mockedSearch.searchRequest.mockResolvedValue({ result: 'deleted' })
 
-      const model = new TestModel({ id: testId, name: 'Test', version: 7 })
-      await model.delete({ expectedVersion: model.version })
+      const model = TestModel.fromJSON({
+        id: testId,
+        name: 'Test',
+        version: 7,
+        _sequenceNumber: 12,
+        _primaryTerm: 3
+      } as never)
+      await model.delete({ atomic: true })
 
       expect(search.searchRequest).toHaveBeenCalledWith(
         'DELETE',
         `/test-index/_doc/${testId}`,
         undefined,
-        { version: 7, versionType: 'internal' }
+        { ifSeqNo: 12, ifPrimaryTerm: 3 }
       )
     })
 

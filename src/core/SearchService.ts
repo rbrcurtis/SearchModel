@@ -229,13 +229,16 @@ class SearchService {
     method: string,
     path: string,
     data?: any,
-    options?: { version?: number; versionType?: 'external' | 'internal' }
+    options?: { version?: number; ifSeqNo?: number; ifPrimaryTerm?: number }
   ): Promise<any> {
     let fullPath = path
     if (options?.version) {
-      const separator = path.includes('?') ? '&' : '?'
-      const versionType = options.versionType || 'external'
-      fullPath = `${path}${separator}version=${options.version}&version_type=${versionType}`
+      const separator = fullPath.includes('?') ? '&' : '?'
+      fullPath = `${fullPath}${separator}version=${options.version}&version_type=external`
+    }
+    if (options?.ifSeqNo !== undefined && options.ifPrimaryTerm !== undefined) {
+      const separator = fullPath.includes('?') ? '&' : '?'
+      fullPath = `${fullPath}${separator}if_seq_no=${options.ifSeqNo}&if_primary_term=${options.ifPrimaryTerm}`
     }
 
     return this.executeRequest(method, fullPath, data)
@@ -364,6 +367,8 @@ class SearchService {
           id: response._id,
           ...response._source,
           version: response._version ?? response._source?.version,
+          _sequenceNumber: response._seq_no,
+          _primaryTerm: response._primary_term,
         })
       }
       return null

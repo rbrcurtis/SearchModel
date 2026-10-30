@@ -396,12 +396,15 @@ export class SearchModel {
         }
         const wait = options.wait ?? false;
         const createOnly = options.createOnly ?? false;
-        const expectedVersion = options.expectedVersion;
+        const atomic = options.atomic ?? false;
         if (createOnly && !this._isNewDocument) {
             throw new Error('createOnly can only be used for new documents');
         }
-        if (expectedVersion && this._isNewDocument) {
-            throw new Error('expectedVersion can only be used for existing documents');
+        if (atomic && this._isNewDocument) {
+            throw new Error('atomic save can only be used for existing documents');
+        }
+        if (atomic && (this._sequenceNumber === undefined || this._primaryTerm === undefined)) {
+            throw new Error('atomic save requires a document loaded by getById');
         }
         const changedFields = this.getChangedFields();
         const saveEvent = { updated: changedFields, meta: options.meta };
@@ -442,12 +445,16 @@ export class SearchModel {
             const refreshParam = wait ? '?refresh=wait_for' : '';
             const operation = createOnly ? '_create' : '_doc';
             const url = `/${indexName}/${operation}/${this.id}${refreshParam}`;
-            const result = expectedVersion
+            const result = atomic
                 ? await searchService.searchRequest('PUT', url, document, {
-                    version: expectedVersion,
-                    versionType: 'internal',
+                    ifSeqNo: this._sequenceNumber,
+                    ifPrimaryTerm: this._primaryTerm,
                 })
                 : await searchService.searchRequest('PUT', url, document);
+            if (result?._seq_no !== undefined)
+                this._sequenceNumber = result._seq_no;
+            if (result?._primary_term !== undefined)
+                this._primaryTerm = result._primary_term;
             if (result && result._version) {
                 this.version = result._version;
                 debug('search', `[SearchModel.save] Updated version from ES response: ${result._version}`);
@@ -472,9 +479,12 @@ export class SearchModel {
         }
     }
     async delete(options = {}) {
-        const { wait = false, requireFound = false, expectedVersion, meta } = options;
+        const { wait = false, requireFound = false, atomic = false, meta } = options;
         if (!this.id) {
             throw new Error('Cannot delete document without ID');
+        }
+        if (atomic && (this._sequenceNumber === undefined || this._primaryTerm === undefined)) {
+            throw new Error('atomic delete requires a document loaded by getById');
         }
         const indexName = this.constructor.indexName;
         if (!indexName) {
@@ -484,8 +494,8 @@ export class SearchModel {
         await this.beforeDelete(deleteEvent);
         try {
             const refreshParam = wait ? '?refresh=wait_for' : '';
-            const result = expectedVersion
-                ? await searchService.searchRequest('DELETE', `/${indexName}/_doc/${this.id}${refreshParam}`, undefined, { version: expectedVersion, versionType: 'internal' })
+            const result = atomic
+                ? await searchService.searchRequest('DELETE', `/${indexName}/_doc/${this.id}${refreshParam}`, undefined, { ifSeqNo: this._sequenceNumber, ifPrimaryTerm: this._primaryTerm })
                 : await searchService.searchRequest('DELETE', `/${indexName}/_doc/${this.id}${refreshParam}`);
             if (requireFound && result?.result !== 'deleted') {
                 throw new Error(`${this.constructor.name} ${this.id} was not found for deletion`);
