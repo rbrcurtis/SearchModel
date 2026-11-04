@@ -1,4 +1,5 @@
 import { search } from '../core/SearchService';
+import { resolveIndexName } from '../core/indexName';
 async function processConcurrently(items, concurrency, processor) {
     const queue = [...items];
     const running = [];
@@ -19,7 +20,7 @@ async function processConcurrently(items, concurrency, processor) {
 }
 export async function walkIndex(ModelClass, terms, callback, options = {}) {
     const { concurrency = 10 } = options;
-    const indexName = ModelClass.indexName;
+    const indexName = resolveIndexName(ModelClass.indexName);
     let lastId = null;
     const size = 100;
     const instances = [];

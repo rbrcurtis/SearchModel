@@ -10,6 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 import 'reflect-metadata';
 import { search as searchService, SearchError, VersionConflictError, } from './SearchService';
 import { getFieldMetadata, StringType, DateType, NumberType, PRIVATE_STORAGE, } from '../decorators';
+import { resolveIndexName } from './indexName';
 import { id } from '../utils/id';
 import { ValidationError } from '../errors/ValidationError';
 import { logError, logWarn, debug } from '../utils/logging';
@@ -258,8 +259,8 @@ export class SearchModel {
         return mapping;
     }
     static async createIndex() {
-        const indexName = this.indexName;
-        if (!indexName) {
+        const indexName = resolveIndexName(this.indexName);
+        if (!this.indexName) {
             throw new Error(`IndexName not defined for ${this.name}`);
         }
         debug('elasticsearch', `🔧 Creating index '${indexName}' with mappings...`, { indexName });
@@ -316,7 +317,7 @@ export class SearchModel {
             throw new Error(`IndexName not defined for ${this.name}`);
         }
         try {
-            const response = await searchService.query(indexName, terms, options);
+            const response = await searchService.query(resolveIndexName(indexName), terms, options);
             return response.hits.map((hit) => new this({
                 ...hit,
             }));
@@ -390,8 +391,8 @@ export class SearchModel {
         debug('search', `[SearchModel.save] Starting save for ${this.constructor.name} (ID: ${this.id})`, {
             options,
         });
-        const indexName = this.constructor.indexName;
-        if (!indexName) {
+        const indexName = resolveIndexName(this.constructor.indexName);
+        if (!this.constructor.indexName) {
             throw new Error(`IndexName not defined for ${this.constructor.name}`);
         }
         const wait = options.wait ?? false;
@@ -486,8 +487,8 @@ export class SearchModel {
         if (atomic && (this._sequenceNumber === undefined || this._primaryTerm === undefined)) {
             throw new Error('atomic delete requires a document loaded by getById');
         }
-        const indexName = this.constructor.indexName;
-        if (!indexName) {
+        const indexName = resolveIndexName(this.constructor.indexName);
+        if (!this.constructor.indexName) {
             throw new Error(`IndexName not defined for ${this.constructor.name}`);
         }
         const deleteEvent = { meta };

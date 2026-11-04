@@ -1,6 +1,7 @@
 // Core exports
 export { SearchModel } from './core/SearchModel'
 export { search, SearchError, VersionConflictError } from './core/SearchService'
+export { resolveIndexName } from './core/indexName'
 
 // Decorator exports
 export {

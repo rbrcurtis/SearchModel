@@ -1,5 +1,6 @@
 import { SearchModel } from '../core/SearchModel'
 import { search } from '../core/SearchService'
+import { resolveIndexName } from '../core/indexName'
 
 async function processConcurrently<T>(
   items: T[],
@@ -34,7 +35,7 @@ export async function walkIndex<T extends { id: string }>(
   options: { concurrency?: number } = {}
 ): Promise<void> {
   const { concurrency = 10 } = options
-  const indexName = ModelClass.indexName
+  const indexName = resolveIndexName(ModelClass.indexName)
   let lastId: string | null = null
   const size = 100
   const instances: T[] = []

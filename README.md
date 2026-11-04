@@ -668,6 +668,23 @@ The library reads configuration from environment variables:
 
 - `ELASTICSEARCH_URL` - Elasticsearch/OpenSearch server URL (required, no default)
 - `DEBUG_TAGS` - Comma-separated debug tags for logging (e.g., "elasticsearch,search")
+- `ES_INDEX_PREFIX` - Optional prefix applied to every model index name (e.g., `agents_`). When set it must match `^[a-z0-9_-]+$`. When unset or empty, index names are used verbatim, preserving existing behavior.
+- `ELASTICSEARCH_AWS_SERVICE` - Optional AWS service name (`es` for OpenSearch) that enables transparent SigV4 request signing. When unset, requests are sent unsigned.
+- `AWS_REGION` - Required when `ELASTICSEARCH_AWS_SERVICE` is set; the region used to sign requests. Credentials are resolved from the standard AWS provider chain.
+
+### Index prefixing
+
+All model operations (index creation, `find`, `findWithTotal`, `getById`, `save`, `delete`, and `walkIndex`) route their index name through `resolveIndexName`, so a configured `ES_INDEX_PREFIX` applies everywhere automatically and idempotently. Raw string indices passed directly to `search.query` stay literal; call `resolveIndexName` yourself for raw calls that must respect the prefix:
+
+```typescript
+import { resolveIndexName } from 'search-model'
+
+await search.query(resolveIndexName('prompt'), ['name:x'])
+```
+
+### AWS OpenSearch SigV4 signing
+
+Set `ELASTICSEARCH_AWS_SERVICE=es` and `AWS_REGION` to sign every request with SigV4. Credentials come from the standard AWS provider chain (`@aws-sdk/credential-provider-node`), and each retry regenerates a fresh signature.
 
 The variable is named `ELASTICSEARCH_URL` even when the backing service is OpenSearch. If an app uses a different environment variable such as `OPENSEARCH_NODE`, map it before model operations:
 

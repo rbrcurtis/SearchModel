@@ -1,11 +1,20 @@
 import 'dotenv/config'
 import { debug, logError, logWarn, log } from '../utils/logging'
+import { resolveIndexName } from './indexName'
+import { SignatureV4 } from '@smithy/signature-v4'
+import { Sha256 } from '@aws-crypto/sha256-js'
+import { defaultProvider } from '@aws-sdk/credential-provider-node'
 
 interface SearchConfig {
   baseUrl: string
   maxRetries: number
   baseDelayMs: number
   maxDelayMs: number
+}
+
+interface SigningConfig {
+  service: string
+  region: string
 }
 
 interface RetryOptions {
@@ -39,6 +48,7 @@ export class VersionConflictError extends SearchError {
 
 class SearchService {
   private config: SearchConfig | undefined
+  private signingConfig: SigningConfig | null | undefined
 
   private getConfig(): SearchConfig {
     if (!this.config) {
@@ -56,9 +66,64 @@ class SearchService {
     return this.config
   }
 
+  private getSigningConfig(): SigningConfig | null {
+    if (this.signingConfig === undefined) {
+      const service = process.env.ELASTICSEARCH_AWS_SERVICE
+      if (!service) {
+        this.signingConfig = null
+      } else {
+        const region = process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION
+        if (!region) {
+          throw new Error(
+            'AWS_REGION environment variable is required when ELASTICSEARCH_AWS_SERVICE is set'
+          )
+        }
+        this.signingConfig = { service, region }
+      }
+    }
+    return this.signingConfig
+  }
+
+  private async signedFetch(
+    url: string,
+    options: RequestInit
+  ): Promise<Response> {
+    const signingConfig = this.getSigningConfig()
+    if (!signingConfig) {
+      return fetch(url, options)
+    }
+
+    const parsed = new URL(url)
+    const signer = new SignatureV4({
+      service: signingConfig.service,
+      region: signingConfig.region,
+      credentials: defaultProvider(),
+      sha256: Sha256,
+    })
+
+    const headers: Record<string, string> = {
+      ...((options.headers as Record<string, string>) ?? {}),
+      host: parsed.host,
+    }
+
+    const signed = await signer.sign({
+      method: (options.method ?? 'GET').toUpperCase(),
+      protocol: parsed.protocol,
+      hostname: parsed.hostname,
+      port: parsed.port ? Number(parsed.port) : undefined,
+      path: parsed.pathname,
+      query: Object.fromEntries(parsed.searchParams.entries()),
+      headers,
+      body: options.body as string | undefined,
+    })
+
+    return fetch(url, { ...options, headers: signed.headers })
+  }
+
   // Reset config for testing
   _resetConfig(): void {
     this.config = undefined
+    this.signingConfig = undefined
   }
 
   private async delay(ms: number): Promise<void> {
@@ -103,7 +168,7 @@ class SearchService {
     })
 
     try {
-      const response = await fetch(url, options)
+      const response = await this.signedFetch(url, options)
 
       debug('elasticsearch', `[search.executeRequest] Got HTTP response`, {
         status: response.status,
@@ -254,9 +319,9 @@ class SearchService {
     if (typeof ModelClass === 'string') {
       indexName = ModelClass
     } else {
-      indexName = (ModelClass as any).indexName
+      indexName = resolveIndexName((ModelClass as any).indexName)
       isModelClass = true
-      if (!indexName) {
+      if (!(ModelClass as any).indexName) {
         throw new SearchError(`IndexName not defined for ${ModelClass.name}`)
       }
     }
@@ -345,8 +410,8 @@ class SearchService {
     },
     id: string
   ): Promise<T | null> {
-    const indexName = (ModelClass as any).indexName
-    if (!indexName) {
+    const indexName = resolveIndexName((ModelClass as any).indexName)
+    if (!(ModelClass as any).indexName) {
       throw new SearchError(`IndexName not defined for ${ModelClass.name}`)
     }
 

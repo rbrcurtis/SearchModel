@@ -45,6 +45,9 @@
     "LICENSE"
   ],
   "dependencies": {
+    "@aws-crypto/sha256-js": "5.2.0",
+    "@aws-sdk/credential-provider-node": "3.972.80",
+    "@smithy/signature-v4": "5.7.2",
     "bson-objectid": "^2.0.4",
     "dotenv": "^16.0.0",
     "queue": "^7.0.0",

@@ -11,7 +11,10 @@ export declare class VersionConflictError extends SearchError {
 }
 declare class SearchService {
     private config;
+    private signingConfig;
     private getConfig;
+    private getSigningConfig;
+    private signedFetch;
     _resetConfig(): void;
     private delay;
     private calculateDelay;

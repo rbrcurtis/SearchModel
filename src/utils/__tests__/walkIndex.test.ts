@@ -1,4 +1,5 @@
 import 'reflect-metadata'
+import { Mock } from 'vitest'
 import { SearchModel } from '../../core/SearchModel'
 import { StringType, NumberType } from '../../decorators'
 import { id } from '../id'
@@ -26,7 +27,6 @@ describe('walkIndex', () => {
       const { search } = await import('../../core/SearchService')
       await search.searchRequest('DELETE', `/${testIndexName}`)
     } catch (err) {
-      // Ignore errors on cleanup
     }
   })
 
@@ -160,4 +160,40 @@ describe('walkIndex', () => {
       expect(updated?.value).toBe(doc.value * 2)
     }
   }, 60000)
+})
+
+describe('walkIndex index prefix', () => {
+  const originalEnv = process.env
+
+  class PrefixWalkModel extends SearchModel<PrefixWalkModel> {
+    static readonly indexName = 'prompt'
+
+    @StringType({ required: true })
+    name!: string
+  }
+
+  beforeEach(() => {
+    process.env = { ...originalEnv, ELASTICSEARCH_URL: 'http://localhost:9200', ES_INDEX_PREFIX: 'agents_' }
+    global.fetch = vi.fn() as Mock
+  })
+
+  afterEach(() => {
+    process.env = originalEnv
+  })
+
+  it('queries the prefixed index and never the unprefixed name', async () => {
+    ;(global.fetch as Mock).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ hits: { total: { value: 0 }, hits: [] } }),
+    })
+
+    await walkIndex(PrefixWalkModel as any, ['*'], async () => {})
+
+    const paths = (global.fetch as Mock).mock.calls.map((call) =>
+      String(call[0]).replace('http://localhost:9200', '')
+    )
+    expect(paths).toContain('/agents_prompt/_search')
+    expect(paths.some((p) => p.startsWith('/prompt/'))).toBe(false)
+  })
 })

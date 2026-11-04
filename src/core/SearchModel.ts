@@ -12,6 +12,7 @@ import {
   NumberType,
   PRIVATE_STORAGE,
 } from '../decorators'
+import { resolveIndexName } from './indexName'
 import { id } from '../utils/id'
 import { ValidationError } from '../errors/ValidationError'
 import { log, logError, logWarn, debug } from '../utils/logging'
@@ -413,8 +414,8 @@ export abstract class SearchModel<T extends SearchModel<T>> {
   static async createIndex<T extends SearchModel<T>>(
     this: new (data?: Partial<T>) => T & { constructor: typeof SearchModel }
   ): Promise<void> {
-    const indexName = (this as any).indexName
-    if (!indexName) {
+    const indexName = resolveIndexName((this as any).indexName)
+    if (!(this as any).indexName) {
       throw new Error(`IndexName not defined for ${this.name}`)
     }
 
@@ -501,7 +502,11 @@ export abstract class SearchModel<T extends SearchModel<T>> {
     }
 
     try {
-      const response = await searchService.query(indexName, terms, options)
+      const response = await searchService.query(
+        resolveIndexName(indexName),
+        terms,
+        options
+      )
       return response.hits.map(
         (hit: any) =>
           new this({
@@ -608,8 +613,8 @@ export abstract class SearchModel<T extends SearchModel<T>> {
         options,
       }
     )
-    const indexName = (this.constructor as any).indexName
-    if (!indexName) {
+    const indexName = resolveIndexName((this.constructor as any).indexName)
+    if (!(this.constructor as any).indexName) {
       throw new Error(`IndexName not defined for ${this.constructor.name}`)
     }
 
@@ -761,8 +766,8 @@ export abstract class SearchModel<T extends SearchModel<T>> {
       throw new Error('atomic delete requires a document loaded by getById')
     }
 
-    const indexName = (this.constructor as any).indexName
-    if (!indexName) {
+    const indexName = resolveIndexName((this.constructor as any).indexName)
+    if (!(this.constructor as any).indexName) {
       throw new Error(`IndexName not defined for ${this.constructor.name}`)
     }
 
