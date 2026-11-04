@@ -414,10 +414,10 @@ export abstract class SearchModel<T extends SearchModel<T>> {
   static async createIndex<T extends SearchModel<T>>(
     this: new (data?: Partial<T>) => T & { constructor: typeof SearchModel }
   ): Promise<void> {
-    const indexName = resolveIndexName((this as any).indexName)
     if (!(this as any).indexName) {
       throw new Error(`IndexName not defined for ${this.name}`)
     }
+    const indexName = resolveIndexName((this as any).indexName)
 
     debug(
       'elasticsearch',
@@ -496,23 +496,17 @@ export abstract class SearchModel<T extends SearchModel<T>> {
     terms: string[] = [],
     options: SearchOptions = {}
   ): Promise<T[]> {
-    const indexName = (this as any).indexName
-    if (!indexName) {
+    if (!(this as any).indexName) {
       throw new Error(`IndexName not defined for ${this.name}`)
     }
 
     try {
-      const response = await searchService.query(
-        resolveIndexName(indexName),
+      const response: { hits: T[]; total: number } = await searchService.query(
+        this as any,
         terms,
         options
       )
-      return response.hits.map(
-        (hit: any) =>
-          new this({
-            ...hit,
-          })
-      )
+      return response.hits
     } catch (error) {
       if (error instanceof SearchError) {
         throw new Error(`Failed to find ${this.name}: ${error.message}`)
@@ -526,12 +520,11 @@ export abstract class SearchModel<T extends SearchModel<T>> {
     terms: string[] = [],
     options: SearchOptions = {}
   ): Promise<{ hits: T[]; total: number }> {
-    const indexName = (this as any).indexName
-    if (!indexName) {
+    if (!(this as any).indexName) {
       throw new Error(`IndexName not defined for ${this.name}`)
     }
     try {
-      return searchService.query(this as any, terms, options)
+      return await searchService.query(this as any, terms, options)
     } catch (error) {
       if (error instanceof SearchError) {
         throw new Error(`Failed to find ${this.name}: ${error.message}`)
@@ -613,10 +606,10 @@ export abstract class SearchModel<T extends SearchModel<T>> {
         options,
       }
     )
-    const indexName = resolveIndexName((this.constructor as any).indexName)
     if (!(this.constructor as any).indexName) {
       throw new Error(`IndexName not defined for ${this.constructor.name}`)
     }
+    const indexName = resolveIndexName((this.constructor as any).indexName)
 
     // Default wait to false for performance
     const wait = options.wait ?? false
@@ -766,10 +759,10 @@ export abstract class SearchModel<T extends SearchModel<T>> {
       throw new Error('atomic delete requires a document loaded by getById')
     }
 
-    const indexName = resolveIndexName((this.constructor as any).indexName)
     if (!(this.constructor as any).indexName) {
       throw new Error(`IndexName not defined for ${this.constructor.name}`)
     }
+    const indexName = resolveIndexName((this.constructor as any).indexName)
 
     const deleteEvent: DeleteEvent = { meta }
 

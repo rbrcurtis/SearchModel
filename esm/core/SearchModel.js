@@ -259,10 +259,10 @@ export class SearchModel {
         return mapping;
     }
     static async createIndex() {
-        const indexName = resolveIndexName(this.indexName);
         if (!this.indexName) {
             throw new Error(`IndexName not defined for ${this.name}`);
         }
+        const indexName = resolveIndexName(this.indexName);
         debug('elasticsearch', `🔧 Creating index '${indexName}' with mappings...`, { indexName });
         try {
             const mapping = SearchModel.generateMapping.call(this);
@@ -312,15 +312,12 @@ export class SearchModel {
         return instance;
     }
     static async find(terms = [], options = {}) {
-        const indexName = this.indexName;
-        if (!indexName) {
+        if (!this.indexName) {
             throw new Error(`IndexName not defined for ${this.name}`);
         }
         try {
-            const response = await searchService.query(resolveIndexName(indexName), terms, options);
-            return response.hits.map((hit) => new this({
-                ...hit,
-            }));
+            const response = await searchService.query(this, terms, options);
+            return response.hits;
         }
         catch (error) {
             if (error instanceof SearchError) {
@@ -330,12 +327,11 @@ export class SearchModel {
         }
     }
     static async findWithTotal(terms = [], options = {}) {
-        const indexName = this.indexName;
-        if (!indexName) {
+        if (!this.indexName) {
             throw new Error(`IndexName not defined for ${this.name}`);
         }
         try {
-            return searchService.query(this, terms, options);
+            return await searchService.query(this, terms, options);
         }
         catch (error) {
             if (error instanceof SearchError) {
@@ -391,10 +387,10 @@ export class SearchModel {
         debug('search', `[SearchModel.save] Starting save for ${this.constructor.name} (ID: ${this.id})`, {
             options,
         });
-        const indexName = resolveIndexName(this.constructor.indexName);
         if (!this.constructor.indexName) {
             throw new Error(`IndexName not defined for ${this.constructor.name}`);
         }
+        const indexName = resolveIndexName(this.constructor.indexName);
         const wait = options.wait ?? false;
         const createOnly = options.createOnly ?? false;
         const atomic = options.atomic ?? false;
@@ -487,10 +483,10 @@ export class SearchModel {
         if (atomic && (this._sequenceNumber === undefined || this._primaryTerm === undefined)) {
             throw new Error('atomic delete requires a document loaded by getById');
         }
-        const indexName = resolveIndexName(this.constructor.indexName);
         if (!this.constructor.indexName) {
             throw new Error(`IndexName not defined for ${this.constructor.name}`);
         }
+        const indexName = resolveIndexName(this.constructor.indexName);
         const deleteEvent = { meta };
         await this.beforeDelete(deleteEvent);
         try {

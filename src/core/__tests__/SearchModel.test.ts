@@ -644,8 +644,8 @@ describe('SearchModel', () => {
       it('should find documents', async () => {
         mockedSearch.query.mockResolvedValue({
           hits: [
-            { id: id(), name: 'Result 1' },
-            { id: id(), name: 'Result 2' }
+            TestModel.fromJSON({ id: id(), name: 'Result 1', version: 1 } as any),
+            TestModel.fromJSON({ id: id(), name: 'Result 2', version: 1 } as any),
           ],
           total: 2
         })
@@ -653,7 +653,7 @@ describe('SearchModel', () => {
         const results = await TestModel.find(['name:Test'])
         
         expect(search.query).toHaveBeenCalledWith(
-          'test-index',
+          TestModel,
           ['name:Test'],
           {}
         )
@@ -670,7 +670,7 @@ describe('SearchModel', () => {
         await TestModel.find(['test'], { limit: 10, sort: 'name:desc' })
         
         expect(search.query).toHaveBeenCalledWith(
-          'test-index',
+          TestModel,
           ['test'],
           { limit: 10, sort: 'name:desc' }
         )
@@ -689,6 +689,17 @@ describe('SearchModel', () => {
         
         expect(result.hits).toEqual(hits)
         expect(result.total).toBe(42)
+      })
+
+      it('wraps an async query rejection in a find error', async () => {
+        const { SearchError } = await vi.importActual<typeof import('../SearchService')>(
+          '../SearchService'
+        )
+        mockedSearch.query.mockRejectedValue(new SearchError('boom'))
+
+        await expect(TestModel.findWithTotal(['test'])).rejects.toThrow(
+          'Failed to find TestModel: boom'
+        )
       })
     })
     

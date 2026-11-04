@@ -13,6 +13,11 @@ class PrefixModel extends SearchModel<PrefixModel> {
   name!: string
 }
 
+class NoIndexModel extends SearchModel<NoIndexModel> {
+  @StringType({ required: true })
+  name!: string
+}
+
 function recordedPaths(): string[] {
   return (global.fetch as Mock).mock.calls.map((call) =>
     String(call[0]).replace('http://localhost:9200', '')
@@ -132,5 +137,26 @@ describe('index prefix applied to model operations', () => {
     const paths = recordedPaths()
     expect(paths).toContain('/agents_prompt/_search')
     expect(paths.some((p) => p.startsWith('/prompt/'))).toBe(false)
+  })
+
+  it('throws the intended error for a missing indexName under a configured prefix', async () => {
+    await expect((NoIndexModel as any).createIndex()).rejects.toThrow(
+      'IndexName not defined for NoIndexModel'
+    )
+    await expect(NoIndexModel.find(['name:x'])).rejects.toThrow(
+      'IndexName not defined for NoIndexModel'
+    )
+    await expect(NoIndexModel.findWithTotal(['name:x'])).rejects.toThrow(
+      'IndexName not defined for NoIndexModel'
+    )
+    await expect(NoIndexModel.getById(id())).rejects.toThrow(
+      'IndexName not defined for NoIndexModel'
+    )
+
+    const instance = NoIndexModel.fromJSON({ id: id(), name: 'x', version: 1 } as any)
+    await expect(instance.save()).rejects.toThrow('IndexName not defined for NoIndexModel')
+    await expect(instance.delete()).rejects.toThrow('IndexName not defined for NoIndexModel')
+
+    expect((global.fetch as Mock)).not.toHaveBeenCalled()
   })
 })

@@ -319,11 +319,11 @@ class SearchService {
     if (typeof ModelClass === 'string') {
       indexName = ModelClass
     } else {
-      indexName = resolveIndexName((ModelClass as any).indexName)
       isModelClass = true
       if (!(ModelClass as any).indexName) {
         throw new SearchError(`IndexName not defined for ${ModelClass.name}`)
       }
+      indexName = resolveIndexName((ModelClass as any).indexName)
     }
 
     const { limit = 1000, sort, page } = options
@@ -410,10 +410,10 @@ class SearchService {
     },
     id: string
   ): Promise<T | null> {
-    const indexName = resolveIndexName((ModelClass as any).indexName)
     if (!(ModelClass as any).indexName) {
       throw new SearchError(`IndexName not defined for ${ModelClass.name}`)
     }
+    const indexName = resolveIndexName((ModelClass as any).indexName)
 
     try {
       const response = await this.searchRequest(

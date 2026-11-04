@@ -210,11 +210,11 @@ class SearchService {
             indexName = ModelClass;
         }
         else {
-            indexName = resolveIndexName(ModelClass.indexName);
             isModelClass = true;
             if (!ModelClass.indexName) {
                 throw new SearchError(`IndexName not defined for ${ModelClass.name}`);
             }
+            indexName = resolveIndexName(ModelClass.indexName);
         }
         const { limit = 1000, sort, page } = options;
         const searchBody = {
@@ -274,10 +274,10 @@ class SearchService {
         }
     }
     async getById(ModelClass, id) {
-        const indexName = resolveIndexName(ModelClass.indexName);
         if (!ModelClass.indexName) {
             throw new SearchError(`IndexName not defined for ${ModelClass.name}`);
         }
+        const indexName = resolveIndexName(ModelClass.indexName);
         try {
             const response = await this.searchRequest('GET', `/${indexName}/_doc/${id}`);
             if (response.found) {
