@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import { debug, logError, logWarn, log } from '../utils/logging'
 import { resolveIndexName } from './indexName'
+import { encodeDocumentId } from '../utils/encodeDocumentId'
 import { SignatureV4 } from '@smithy/signature-v4'
 import { Sha256 } from '@aws-crypto/sha256-js'
 import { defaultProvider } from '@aws-sdk/credential-provider-node'
@@ -418,7 +419,7 @@ class SearchService {
     try {
       const response = await this.searchRequest(
         'GET',
-        `/${indexName}/_doc/${id}`
+        `/${indexName}/_doc/${encodeDocumentId(id)}`
       )
       if (response.found) {
         return (ModelClass as any).fromJSON({

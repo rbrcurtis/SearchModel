@@ -165,6 +165,8 @@ All models extending `SearchModel` automatically include these fields:
 - **`updatedAt`** - Timestamp when document was last modified
 - **`version`** - Version number for optimistic locking (starts at 1)
 
+Model IDs are URL-encoded automatically in document request paths (`getById`, `save`, create, and `delete`), so ids containing characters such as `|`, `:`, `/`, `?`, `#`, or spaces are handled safely. The loaded `id` remains the original logical value.
+
 You may redeclare these fields in subclasses when API decorators, schema generation, or readability benefit from explicit declarations. Use TypeScript `declare` so no JavaScript class field is emitted:
 
 ```typescript

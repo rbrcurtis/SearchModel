@@ -13,6 +13,7 @@ import {
   PRIVATE_STORAGE,
 } from '../decorators'
 import { resolveIndexName } from './indexName'
+import { encodeDocumentId } from '../utils/encodeDocumentId'
 import { id } from '../utils/id'
 import { ValidationError } from '../errors/ValidationError'
 import { log, logError, logWarn, debug } from '../utils/logging'
@@ -696,7 +697,7 @@ export abstract class SearchModel<T extends SearchModel<T>> {
       // Build the URL with optional refresh parameter
       const refreshParam = wait ? '?refresh=wait_for' : ''
       const operation = createOnly ? '_create' : '_doc'
-      const url = `/${indexName}/${operation}/${this.id}${refreshParam}`
+      const url = `/${indexName}/${operation}/${encodeDocumentId(this.id)}${refreshParam}`
 
       const result = atomic
         ? await searchService.searchRequest('PUT', url, document, {
@@ -778,13 +779,13 @@ export abstract class SearchModel<T extends SearchModel<T>> {
       const result = atomic
         ? await searchService.searchRequest(
             'DELETE',
-            `/${indexName}/_doc/${this.id}${refreshParam}`,
+            `/${indexName}/_doc/${encodeDocumentId(this.id)}${refreshParam}`,
             undefined,
             { ifSeqNo: this._sequenceNumber, ifPrimaryTerm: this._primaryTerm }
           )
         : await searchService.searchRequest(
             'DELETE',
-            `/${indexName}/_doc/${this.id}${refreshParam}`
+            `/${indexName}/_doc/${encodeDocumentId(this.id)}${refreshParam}`
           )
 
       if (requireFound && result?.result !== 'deleted') {

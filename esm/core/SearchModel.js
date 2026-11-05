@@ -11,6 +11,7 @@ import 'reflect-metadata';
 import { search as searchService, SearchError, VersionConflictError, } from './SearchService';
 import { getFieldMetadata, StringType, DateType, NumberType, PRIVATE_STORAGE, } from '../decorators';
 import { resolveIndexName } from './indexName';
+import { encodeDocumentId } from '../utils/encodeDocumentId';
 import { id } from '../utils/id';
 import { ValidationError } from '../errors/ValidationError';
 import { logError, logWarn, debug } from '../utils/logging';
@@ -444,7 +445,7 @@ export class SearchModel {
         try {
             const refreshParam = wait ? '?refresh=wait_for' : '';
             const operation = createOnly ? '_create' : '_doc';
-            const url = `/${indexName}/${operation}/${this.id}${refreshParam}`;
+            const url = `/${indexName}/${operation}/${encodeDocumentId(this.id)}${refreshParam}`;
             const result = atomic
                 ? await searchService.searchRequest('PUT', url, document, {
                     ifSeqNo: this._sequenceNumber,
@@ -495,8 +496,8 @@ export class SearchModel {
         try {
             const refreshParam = wait ? '?refresh=wait_for' : '';
             const result = atomic
-                ? await searchService.searchRequest('DELETE', `/${indexName}/_doc/${this.id}${refreshParam}`, undefined, { ifSeqNo: this._sequenceNumber, ifPrimaryTerm: this._primaryTerm })
-                : await searchService.searchRequest('DELETE', `/${indexName}/_doc/${this.id}${refreshParam}`);
+                ? await searchService.searchRequest('DELETE', `/${indexName}/_doc/${encodeDocumentId(this.id)}${refreshParam}`, undefined, { ifSeqNo: this._sequenceNumber, ifPrimaryTerm: this._primaryTerm })
+                : await searchService.searchRequest('DELETE', `/${indexName}/_doc/${encodeDocumentId(this.id)}${refreshParam}`);
             if (requireFound && result?.result !== 'deleted') {
                 throw new Error(`${this.constructor.name} ${this.id} was not found for deletion`);
             }
