@@ -29,6 +29,10 @@ interface BaseFieldOptions {
  * @property trim - Remove leading/trailing whitespace
  * @property lowerCase - Convert string to lowercase
  * @property upperCase - Convert string to uppercase
+ * @property keyword - Include a `.keyword` subfield in the Elasticsearch mapping.
+ *                     Defaults to true. Set false for large text bodies that can
+ *                     exceed the keyword max term length (32766 bytes), which
+ *                     would otherwise reject the document at index time.
  *
  * Transformations are applied in order: trim → case conversion
  */
@@ -36,6 +40,7 @@ interface StringFieldOptions extends BaseFieldOptions {
   trim?: boolean
   lowerCase?: boolean
   upperCase?: boolean
+  keyword?: boolean
 }
 
 interface VectorFieldOptions extends BaseFieldOptions {

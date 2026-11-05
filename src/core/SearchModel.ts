@@ -325,6 +325,9 @@ export abstract class SearchModel<T extends SearchModel<T>> {
 
     switch (type) {
       case 'string':
+        if (options && (options as any).keyword === false) {
+          return { type: 'text' }
+        }
         return { type: 'text', fields: { keyword: { type: 'keyword' } } }
       case 'keyword':
         return { type: 'keyword', fields: { keyword: { type: 'keyword' } } }

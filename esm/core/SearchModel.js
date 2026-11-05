@@ -190,6 +190,9 @@ export class SearchModel {
         const { type, options } = field;
         switch (type) {
             case 'string':
+                if (options && options.keyword === false) {
+                    return { type: 'text' };
+                }
                 return { type: 'text', fields: { keyword: { type: 'keyword' } } };
             case 'keyword':
                 return { type: 'keyword', fields: { keyword: { type: 'keyword' } } };

@@ -267,6 +267,7 @@ await user.save()
 - Fields ending in `id` or `ids` are automatically mapped as `keyword` even when declared with `@StringType()`.
 - Prefer explicit `@KeywordType()` for IDs, statuses, slugs, and enum-like fields anyway; it documents intent.
 - `@StringType()` maps to `text` with a `.keyword` subfield.
+- `@StringType({ keyword: false })` maps to `text` only, with no `.keyword` subfield. Use this for large bodies (long documents, prompt text, compiled output) that can exceed the keyword max term length of 32766 bytes; with the default `.keyword` subfield, OpenSearch rejects the whole document at index time once the value is larger than that limit.
 - `@KeywordType()` maps to `keyword` and is the safe default for exact filters.
 
 ### Decorator Options
@@ -289,6 +290,7 @@ interface StringFieldOptions extends BaseFieldOptions {
   trim?: boolean      // Remove leading/trailing whitespace
   lowerCase?: boolean // Convert to lowercase
   upperCase?: boolean // Convert to uppercase
+  keyword?: boolean   // Include a .keyword subfield in the mapping (default true); set false for large text bodies that exceed the 32766-byte keyword limit
 }
 ```
 

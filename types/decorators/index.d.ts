@@ -9,6 +9,7 @@ interface StringFieldOptions extends BaseFieldOptions {
     trim?: boolean;
     lowerCase?: boolean;
     upperCase?: boolean;
+    keyword?: boolean;
 }
 interface VectorFieldOptions extends BaseFieldOptions {
     dimension: number;
