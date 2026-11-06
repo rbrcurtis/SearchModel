@@ -710,6 +710,8 @@ For tests or workflows that immediately read after writing, use `save({ wait: tr
 - `findOne(terms)` - Find first matching document or null
 - `getById(id)` - Get document by ID or null if not found
 - `createIndex()` - Create Elasticsearch index with mappings from decorators
+- `getMapping()` - Get the generated Elasticsearch mapping body
+- `updateFieldMapping(fieldName)` - Add one decorated field mapping to an existing index
 - `generateMapping()` - Generate Elasticsearch mapping from decorator metadata
 - `fromJSON(properties)` - Create model instance from plain object (factory method)
 - `getElasticsearchFieldType(field)` - Convert field metadata to Elasticsearch field type

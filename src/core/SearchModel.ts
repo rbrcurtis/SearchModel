@@ -414,6 +414,36 @@ export abstract class SearchModel<T extends SearchModel<T>> {
     return mapping
   }
 
+  static async getMapping<T extends SearchModel<T>>(
+    this: new (data?: Partial<T>) => T & { constructor: typeof SearchModel }
+  ): Promise<Record<string, any>> {
+    return SearchModel.generateMapping.call(this as any).mappings
+  }
+
+  static async updateFieldMapping<T extends SearchModel<T>>(
+    this: new (data?: Partial<T>) => T & { constructor: typeof SearchModel },
+    fieldName: string
+  ): Promise<boolean> {
+    if (!(this as any).indexName) {
+      throw new Error(`IndexName not defined for ${this.name}`)
+    }
+
+    const mapping = await SearchModel.getMapping.call(this as any)
+    const fieldMapping = mapping.properties[fieldName]
+    if (!fieldMapping) {
+      throw new Error(`Field '${fieldName}' not defined for ${this.name}`)
+    }
+
+    const indexName = resolveIndexName((this as any).indexName)
+    const response = await searchService.searchRequest(
+      'PUT',
+      `/${indexName}/_mapping`,
+      { properties: { [fieldName]: fieldMapping } }
+    )
+
+    return response.acknowledged === true
+  }
+
   // Create or update Elasticsearch index with proper mapping
   static async createIndex<T extends SearchModel<T>>(
     this: new (data?: Partial<T>) => T & { constructor: typeof SearchModel }

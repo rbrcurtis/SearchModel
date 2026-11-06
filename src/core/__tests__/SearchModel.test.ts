@@ -273,6 +273,33 @@ describe('SearchModel', () => {
     })
   })
 
+  describe('mapping management', () => {
+    it('returns the generated mapping body', async () => {
+      await expect(TestModel.getMapping()).resolves.toEqual(
+        TestModel.generateMapping().mappings
+      )
+    })
+
+    it('adds one generated field mapping to the resolved index', async () => {
+      mockedSearch.searchRequest.mockResolvedValue({ acknowledged: true })
+
+      await expect(TestModel.updateFieldMapping('score')).resolves.toBe(true)
+
+      expect(search.searchRequest).toHaveBeenCalledWith(
+        'PUT',
+        '/test-index/_mapping',
+        { properties: { score: { type: 'double' } } }
+      )
+    })
+
+    it('rejects a field that is not defined on the model', async () => {
+      await expect(TestModel.updateFieldMapping('missing')).rejects.toThrow(
+        "Field 'missing' not defined for TestModel"
+      )
+      expect(search.searchRequest).not.toHaveBeenCalled()
+    })
+  })
+
   describe('createIndex', () => {
     it('should create index with correct mapping', async () => {
       mockedSearch.searchRequest.mockResolvedValue({})

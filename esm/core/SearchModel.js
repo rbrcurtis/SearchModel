@@ -262,6 +262,22 @@ export class SearchModel {
         }
         return mapping;
     }
+    static async getMapping() {
+        return SearchModel.generateMapping.call(this).mappings;
+    }
+    static async updateFieldMapping(fieldName) {
+        if (!this.indexName) {
+            throw new Error(`IndexName not defined for ${this.name}`);
+        }
+        const mapping = await SearchModel.getMapping.call(this);
+        const fieldMapping = mapping.properties[fieldName];
+        if (!fieldMapping) {
+            throw new Error(`Field '${fieldName}' not defined for ${this.name}`);
+        }
+        const indexName = resolveIndexName(this.indexName);
+        const response = await searchService.searchRequest('PUT', `/${indexName}/_mapping`, { properties: { [fieldName]: fieldMapping } });
+        return response.acknowledged === true;
+    }
     static async createIndex() {
         if (!this.indexName) {
             throw new Error(`IndexName not defined for ${this.name}`);
