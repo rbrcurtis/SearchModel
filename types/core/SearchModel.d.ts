@@ -1,5 +1,5 @@
-import "reflect-metadata";
-import { FieldMetadata } from "../decorators";
+import 'reflect-metadata';
+import { FieldMetadata } from '../decorators';
 export interface SearchOptions {
     limit?: number;
     sort?: string | Record<string, unknown>[];

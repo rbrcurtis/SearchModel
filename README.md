@@ -38,7 +38,7 @@ DEBUG_TAGS=elasticsearch,search  # Optional: for debug logging
 ### 2. Define your model
 
 ```typescript
-import "dotenv/config";
+import 'dotenv/config'
 import {
   SearchModel,
   StringType,
@@ -47,62 +47,62 @@ import {
   NumberType,
   ObjectType,
   StringArrayType,
-} from "search-model";
+} from 'search-model'
 
 class User extends SearchModel<User> {
-  static readonly indexName = "users";
+  static readonly indexName = 'users'
 
   // These fields exist on SearchModel, but redeclaring them helps API decorators
   // and makes the model contract obvious to agents and generated schemas.
   // Use `declare` so TypeScript does not emit class fields that overwrite base accessors.
   @KeywordType()
-  declare id: string;
+  declare id: string
 
   @DateType()
-  declare createdAt: Date;
+  declare createdAt: Date
 
   @DateType()
-  declare updatedAt: Date;
+  declare updatedAt: Date
 
   @NumberType()
-  declare version: number;
+  declare version: number
 
   @KeywordType({
     required: true,
     trim: true,
     lowerCase: true,
-    validate: (email) => email.includes("@"),
+    validate: (email) => email.includes('@')
   })
-  email!: string;
+  email!: string
 
   @StringType({ required: true, trim: true })
-  name!: string;
+  name!: string
 
   @NumberType({
-    validate: (age) => age >= 0 && age <= 150,
+    validate: (age) => age >= 0 && age <= 150
   })
-  age?: number;
+  age?: number
 
   @DateType()
-  birthDate?: Date;
+  birthDate?: Date
 
   @StringArrayType({ default: () => [] })
-  roles!: string[];
+  roles!: string[]
 
   @ObjectType({
     properties: {
-      street: { type: "string", options: { required: true } },
-      city: { type: "string", options: { required: true } },
-      zipCode: { type: "string" },
-      country: { type: "keyword" },
-    },
+      street: { type: 'string', options: { required: true } },
+      city: { type: 'string', options: { required: true } },
+      zipCode: { type: 'string' },
+      country: { type: 'keyword' }
+    }
   })
   address?: {
-    street: string;
-    city: string;
-    zipCode?: string;
-    country?: string;
-  };
+    street: string
+    city: string
+    zipCode?: string
+    country?: string
+  }
 }
 ```
 
@@ -110,50 +110,50 @@ class User extends SearchModel<User> {
 
 ```typescript
 // Create Elasticsearch index with auto-generated mappings
-await User.createIndex();
+await User.createIndex()
 
 // Create a new user
 const user = await User.create({
-  email: "john@example.com",
-  name: "John Doe",
+  email: 'john@example.com',
+  name: 'John Doe',
   age: 30,
-  roles: ["user", "admin"],
+  roles: ['user', 'admin'],
   address: {
-    street: "123 Main St",
-    city: "New York",
-  },
-});
+    street: '123 Main St',
+    city: 'New York'
+  }
+})
 
 // Find users
-const users = await User.find(["email:john*", "roles:admin"], {
+const users = await User.find(['email:john*', 'roles:admin'], {
   limit: 10,
-  sort: "createdAt:desc",
-});
+  sort: 'createdAt:desc'
+})
 
 // Find one user
-const user = await User.findOne(["email:john@example.com"]);
+const user = await User.findOne(['email:john@example.com'])
 
 // Get by ID
-const user = await User.getById("507f1f77bcf86cd799439011");
+const user = await User.getById('507f1f77bcf86cd799439011')
 
 // Update individual fields
-user.name = "Jane Doe";
-await user.save();
+user.name = 'Jane Doe'
+await user.save()
 
 // Update multiple fields at once; update() mutates the instance but does not save
 user.update({
-  name: "Jane Smith",
+  name: 'Jane Smith',
   age: 32,
-  roles: ["user", "editor"],
-});
-await user.save();
+  roles: ['user', 'editor']
+})
+await user.save()
 
 // Array mutations are tracked by the current SearchModel array proxy
-user.roles.push("moderator");
-await user.save({ wait: true }); // use wait when immediate read-after-write matters
+user.roles.push('moderator')
+await user.save({ wait: true }) // use wait when immediate read-after-write matters
 
 // Delete
-await user.delete();
+await user.delete()
 ```
 
 ## Automatic Fields
@@ -171,19 +171,19 @@ You may redeclare these fields in subclasses when API decorators, schema generat
 
 ```typescript
 class User extends SearchModel<User> {
-  static readonly indexName = "users";
+  static readonly indexName = 'users'
 
   @KeywordType()
-  declare id: string;
+  declare id: string
 
   @DateType()
-  declare createdAt: Date;
+  declare createdAt: Date
 
   @DateType()
-  declare updatedAt: Date;
+  declare updatedAt: Date
 
   @NumberType()
-  declare version: number;
+  declare version: number
 }
 ```
 
@@ -208,24 +208,24 @@ The base class automatically manages timestamps:
 ```typescript
 // When creating a new document
 const user = await User.create({
-  name: "John Doe",
-  email: "john@example.com",
-});
+  name: 'John Doe',
+  email: 'john@example.com'
+})
 // createdAt and updatedAt are automatically set to current time
 // version is set to 1
-console.log(user.createdAt); // 2024-01-15T10:30:00.000Z
-console.log(user.updatedAt); // 2024-01-15T10:30:00.000Z
-console.log(user.version); // 1
+console.log(user.createdAt) // 2024-01-15T10:30:00.000Z
+console.log(user.updatedAt) // 2024-01-15T10:30:00.000Z
+console.log(user.version)   // 1
 
 // When updating an existing document
-user.name = "Jane Doe";
-await user.save();
+user.name = 'Jane Doe'
+await user.save()
 // updatedAt is automatically updated to current time
 // version is incremented
 // createdAt remains unchanged
-console.log(user.createdAt); // 2024-01-15T10:30:00.000Z (unchanged)
-console.log(user.updatedAt); // 2024-01-15T10:35:00.000Z (updated)
-console.log(user.version); // 2
+console.log(user.createdAt) // 2024-01-15T10:30:00.000Z (unchanged)
+console.log(user.updatedAt) // 2024-01-15T10:35:00.000Z (updated)
+console.log(user.version)   // 2
 ```
 
 You normally do not manually set these fields at runtime - they are managed automatically by the base class.
@@ -250,11 +250,11 @@ You normally do not manually set these fields at runtime - they are managed auto
 Array mutations such as `.push()`, `.pop()`, and `.splice()` are tracked by the current SearchModel array proxy for `StringArrayType` and `ObjectArrayType` fields:
 
 ```typescript
-user.roles.push("editor");
-await user.save();
+user.roles.push('editor')
+await user.save()
 
-user.roles = [...user.roles, "moderator"];
-await user.save();
+user.roles = [...user.roles, 'moderator']
+await user.save()
 ```
 
 ### Complex Types
@@ -278,10 +278,10 @@ All decorators support these base options:
 
 ```typescript
 interface BaseFieldOptions {
-  required?: boolean; // Field is required
-  validate?: (value) => boolean; // Custom validation function
-  transform?: (value) => any; // Transform value before storage
-  default?: () => any; // Default value function
+  required?: boolean           // Field is required
+  validate?: (value) => boolean  // Custom validation function
+  transform?: (value) => any     // Transform value before storage
+  default?: () => any           // Default value function
 }
 ```
 
@@ -289,10 +289,10 @@ String-specific options:
 
 ```typescript
 interface StringFieldOptions extends BaseFieldOptions {
-  trim?: boolean; // Remove leading/trailing whitespace
-  lowerCase?: boolean; // Convert to lowercase
-  upperCase?: boolean; // Convert to uppercase
-  keyword?: boolean; // Include a .keyword subfield in the mapping (default true); set false for large text bodies that exceed the 32766-byte keyword limit
+  trim?: boolean      // Remove leading/trailing whitespace
+  lowerCase?: boolean // Convert to lowercase
+  upperCase?: boolean // Convert to uppercase
+  keyword?: boolean   // Include a .keyword subfield in the mapping (default true); set false for large text bodies that exceed the 32766-byte keyword limit
 }
 ```
 
@@ -300,24 +300,24 @@ interface StringFieldOptions extends BaseFieldOptions {
 
 ```typescript
 class Post extends SearchModel<Post> {
-  static readonly indexName = "posts";
+  static readonly indexName = 'posts'
 
   @StringType({ required: true })
-  title!: string;
+  title!: string
 
   @StringType()
-  slug!: string;
+  slug!: string
 
   protected async beforeSave(event: SaveEvent): Promise<boolean> {
     // Generate slug from title
     if (!this.slug) {
-      this.slug = this.title.toLowerCase().replace(/\s+/g, "-");
+      this.slug = this.title.toLowerCase().replace(/\s+/g, '-')
     }
-    return true;
+    return true
   }
 
   protected async afterSave(event: SaveEvent): Promise<void> {
-    console.log("Updated fields:", event.updated);
+    console.log('Updated fields:', event.updated)
     // Trigger cache invalidation, send notifications, etc.
   }
 
@@ -337,40 +337,40 @@ class Post extends SearchModel<Post> {
 
 ```typescript
 class BlogPost extends SearchModel<BlogPost> {
-  static readonly indexName = "blog_posts";
-
+  static readonly indexName = 'blog_posts'
+  
   @StringType({ required: true })
-  title!: string;
-
+  title!: string
+  
   @ObjectArrayType({
     properties: {
-      author: { type: "string", options: { required: true } },
-      content: { type: "string", options: { required: true } },
-      timestamp: { type: "date", options: { required: true } },
-      likes: { type: "number" },
+      author: { type: 'string', options: { required: true } },
+      content: { type: 'string', options: { required: true } },
+      timestamp: { type: 'date', options: { required: true } },
+      likes: { type: 'number' },
       replies: {
-        type: "objectArray",
+        type: 'objectArray',
         options: {
           properties: {
-            author: { type: "string", options: { required: true } },
-            content: { type: "string", options: { required: true } },
-            timestamp: { type: "date" },
-          },
-        },
-      },
-    },
+            author: { type: 'string', options: { required: true } },
+            content: { type: 'string', options: { required: true } },
+            timestamp: { type: 'date' }
+          }
+        }
+      }
+    }
   })
   comments!: Array<{
-    author: string;
-    content: string;
-    timestamp: Date;
-    likes?: number;
+    author: string
+    content: string
+    timestamp: Date
+    likes?: number
     replies?: Array<{
-      author: string;
-      content: string;
-      timestamp?: Date;
-    }>;
-  }>;
+      author: string
+      content: string
+      timestamp?: Date
+    }>
+  }>
 }
 ```
 
@@ -380,53 +380,53 @@ SearchModel uses Elasticsearch query-string terms as an array of strings. Terms 
 
 ```typescript
 // Simple field search
-await User.find(["email:john@example.com"]);
+await User.find(['email:john@example.com'])
 
 // Wildcards
-await User.find(["name:John*"]);
+await User.find(['name:John*'])
 
 // Multiple conditions (AND)
-await User.find(["status:active", "role:admin"]);
+await User.find(['status:active', 'role:admin'])
 
 // Range queries
-await User.find(["age:[18 TO 65]"]);
+await User.find(['age:[18 TO 65]'])
 
 // Query by automatic fields (createdAt, updatedAt, version)
-await User.find(["createdAt:[2024-01-01 TO 2024-12-31]"]);
-await User.find(["updatedAt:[2024-01-01 TO *]"]);
+await User.find(['createdAt:[2024-01-01 TO 2024-12-31]'])
+await User.find(['updatedAt:[2024-01-01 TO *]'])
 
 // Sort by automatic timestamp fields
-await User.find(["status:active"], {
-  sort: "createdAt:desc",
-  limit: 10,
-});
+await User.find(['status:active'], {
+  sort: 'createdAt:desc',
+  limit: 10
+})
 
 // Find with total count
-const { hits, total } = await User.findWithTotal(["status:active"], {
+const { hits, total } = await User.findWithTotal(['status:active'], {
   limit: 50,
-  sort: "updatedAt:desc",
-  page: 2,
-});
+  sort: 'updatedAt:desc',
+  page: 2
+})
 
 // Find one document
-const user = await User.findOne(["email:john@example.com"]);
+const user = await User.findOne(['email:john@example.com'])
 
 // Raw Elasticsearch sort arrays are allowed when needed
-await User.find(["status:active"], {
-  sort: [{ createdAt: { order: "desc" } }],
-});
+await User.find(['status:active'], {
+  sort: [{ createdAt: { order: 'desc' } }]
+})
 ```
 
 Do not use ORM-style where objects; they are not part of this API:
 
 ```typescript
 // ❌ Wrong
-await User.find({ where: { status: "active" } });
-await User.findOne({ email: "john@example.com" });
+await User.find({ where: { status: 'active' } })
+await User.findOne({ email: 'john@example.com' })
 
 // ✅ Correct
-await User.find(["status:active"]);
-await User.findOne(["email:john@example.com"]);
+await User.find(['status:active'])
+await User.findOne(['email:john@example.com'])
 ```
 
 ## Direct Elasticsearch Access
@@ -434,24 +434,24 @@ await User.findOne(["email:john@example.com"]);
 For advanced use cases, you can access the Elasticsearch client directly:
 
 ```typescript
-import { search } from "search-model";
+import { search } from 'search-model'
 
 // Raw Elasticsearch request
-const response = await search.searchRequest("POST", "/users/_search", {
+const response = await search.searchRequest('POST', '/users/_search', {
   query: {
     bool: {
       must: [
-        { match: { status: "active" } },
-        { range: { age: { gte: 18, lte: 65 } } },
-      ],
-    },
+        { match: { status: 'active' } },
+        { range: { age: { gte: 18, lte: 65 } } }
+      ]
+    }
   },
   aggregations: {
     age_groups: {
-      terms: { field: "age" },
-    },
-  },
-});
+      terms: { field: 'age' }
+    }
+  }
+})
 ```
 
 ## Batch Updates
@@ -459,26 +459,26 @@ const response = await search.searchRequest("POST", "/users/_search", {
 The `.update()` method allows you to update multiple properties at once efficiently:
 
 ```typescript
-const user = await User.getById("507f1f77bcf86cd799439011");
+const user = await User.getById('507f1f77bcf86cd799439011')
 
 // Update multiple fields with a single method call
 user.update({
-  name: "John Smith",
+  name: 'John Smith',
   age: 31,
-  email: "john.smith@example.com",
-  roles: ["user", "admin"],
+  email: 'john.smith@example.com',
+  roles: ['user', 'admin'],
   address: {
-    street: "456 Oak Avenue",
-    city: "Boston",
-    zipCode: "02101",
-  },
-});
+    street: '456 Oak Avenue',
+    city: 'Boston',
+    zipCode: '02101'
+  }
+})
 
 // Check which fields were changed
-console.log(user.getChangedFields()); // ['name', 'age', 'email', 'roles', 'address']
+console.log(user.getChangedFields()) // ['name', 'age', 'email', 'roles', 'address']
 
 // Save all changes at once
-await user.save();
+await user.save()
 ```
 
 ### Key Features of `.update()`:
@@ -493,21 +493,20 @@ await user.save();
 ```typescript
 // Example with invalid fields - they're safely ignored
 user.update({
-  name: "Valid Field", // ✅ Will be updated
-  invalidField: "ignored", // ❌ Silently ignored
-  anotherFake: { data: 123 }, // ❌ Silently ignored
-});
+  name: 'Valid Field',        // ✅ Will be updated
+  invalidField: 'ignored',    // ❌ Silently ignored
+  anotherFake: { data: 123 }  // ❌ Silently ignored
+})
 
 // Only 'name' will be tracked as changed
-console.log(user.getChangedFields()); // ['name']
+console.log(user.getChangedFields()) // ['name']
 
 // Method chaining
-user
-  .update({ name: "First" })
-  .update({ age: 25 })
-  .update({ email: "new@email.com" });
+user.update({ name: 'First' })
+    .update({ age: 25 })
+    .update({ email: 'new@email.com' })
 
-await user.save(); // Saves all changes
+await user.save() // Saves all changes
 ```
 
 ## Walking Large Datasets
@@ -515,22 +514,22 @@ await user.save(); // Saves all changes
 The `walkIndex` utility provides an efficient way to iterate through large numbers of documents with controlled concurrency:
 
 ```typescript
-import { walkIndex } from "search-model";
+import { walkIndex } from 'search-model'
 
 // Process all active users with 10 concurrent operations
 await walkIndex(
   User,
-  ["status:active"],
+  ['status:active'],
   async (user) => {
     // Process each user
-    console.log(`Processing user: ${user.email}`);
+    console.log(`Processing user: ${user.email}`)
 
     // Update, delete, or perform any async operation
-    user.lastProcessed = new Date();
-    await user.save();
+    user.lastProcessed = new Date()
+    await user.save()
   },
-  { concurrency: 10 },
-);
+  { concurrency: 10 }
+)
 ```
 
 ### How It Works
@@ -557,29 +556,33 @@ walkIndex<T extends typeof SearchModel>(
 // Bulk update all users created before 2024
 await walkIndex(
   User,
-  ["createdAt:[* TO 2024-01-01]"],
+  ['createdAt:[* TO 2024-01-01]'],
   async (user) => {
-    user.migrated = true;
-    await user.save();
+    user.migrated = true
+    await user.save()
   },
-  { concurrency: 20 },
-);
+  { concurrency: 20 }
+)
 
 // Process all documents (empty query matches all)
-await walkIndex(Product, [], async (product) => {
-  // Recalculate pricing, update cache, etc.
-  await updateProductCache(product);
-});
+await walkIndex(
+  Product,
+  [],
+  async (product) => {
+    // Recalculate pricing, update cache, etc.
+    await updateProductCache(product)
+  }
+)
 
 // Delete old records with controlled parallelism
 await walkIndex(
   LogEntry,
-  ["timestamp:[* TO 2023-01-01]"],
+  ['timestamp:[* TO 2023-01-01]'],
   async (entry) => {
-    await entry.delete();
+    await entry.delete()
   },
-  { concurrency: 5 }, // Lower concurrency for delete operations
-);
+  { concurrency: 5 } // Lower concurrency for delete operations
+)
 ```
 
 ### Performance Tips
@@ -590,14 +593,18 @@ await walkIndex(
 - **Error Handling**: Wrap callback in try-catch to handle individual document failures
 
 ```typescript
-await walkIndex(User, ["status:pending"], async (user) => {
-  try {
-    await processUser(user);
-  } catch (error) {
-    console.error(`Failed to process user ${user.id}:`, error);
-    // Log error but continue processing other users
+await walkIndex(
+  User,
+  ['status:pending'],
+  async (user) => {
+    try {
+      await processUser(user)
+    } catch (error) {
+      console.error(`Failed to process user ${user.id}:`, error)
+      // Log error but continue processing other users
+    }
   }
-});
+)
 ```
 
 ## Change Tracking
@@ -606,24 +613,19 @@ Models automatically track which fields have been modified:
 
 ```typescript
 class Product extends SearchModel<Product> {
-  static readonly indexName = "products";
+  static readonly indexName = 'products'
 
   @StringType({ required: true })
-  name!: string;
+  name!: string
 
   @NumberType({ required: true })
-  price!: number;
+  price!: number
 
   protected async beforeSave(event: SaveEvent): Promise<void> {
     // event.updated contains array of changed field names
-    if (event.updated.includes("price")) {
+    if (event.updated.includes('price')) {
       // Price changed, update price history
-      console.log(
-        "Price changed from",
-        this.getOriginalValue("price"),
-        "to",
-        this.price,
-      );
+      console.log('Price changed from', this.getOriginalValue('price'), 'to', this.price)
     }
   }
 }
@@ -634,11 +636,11 @@ class Product extends SearchModel<Product> {
 Current SearchModel wraps `StringArrayType` and `ObjectArrayType` values in an array proxy, so array mutations are tracked:
 
 ```typescript
-product.tags.push("new-tag");
-console.log(product.getChangedFields()); // ['tags']
+product.tags.push('new-tag')
+console.log(product.getChangedFields()) // ['tags']
 
-product.tags = [...product.tags, "another-tag"];
-console.log(product.getChangedFields()); // ['tags']
+product.tags = [...product.tags, 'another-tag']
+console.log(product.getChangedFields()) // ['tags']
 ```
 
 Vector arrays are intentionally not proxy-wrapped. Assign a full new vector array when changing a `VectorType` field.
@@ -646,20 +648,20 @@ Vector arrays are intentionally not proxy-wrapped. Assign a full new vector arra
 ## Error Handling
 
 ```typescript
-import { SearchError, VersionConflictError } from "search-model";
+import { SearchError, VersionConflictError } from 'search-model'
 
 try {
-  await user.save();
+  await user.save()
 } catch (error) {
   if (error instanceof VersionConflictError) {
     // Handle concurrent modification
-    console.error("Document was modified by another process");
+    console.error('Document was modified by another process')
   } else if (error instanceof SearchError) {
     // Handle Elasticsearch errors
-    console.error("Search error:", error.statusCode, error.message);
+    console.error('Search error:', error.statusCode, error.message)
   } else {
     // Handle validation errors
-    console.error("Validation error:", error.message);
+    console.error('Validation error:', error.message)
   }
 }
 ```
@@ -679,9 +681,9 @@ The library reads configuration from environment variables:
 All model operations (index creation, `find`, `findWithTotal`, `getById`, `save`, `delete`, and `walkIndex`) route their index name through `resolveIndexName`, so a configured `ES_INDEX_PREFIX` applies everywhere automatically and idempotently. Raw string indices passed directly to `search.query` stay literal; call `resolveIndexName` yourself for raw calls that must respect the prefix:
 
 ```typescript
-import { resolveIndexName } from "search-model";
+import { resolveIndexName } from 'search-model'
 
-await search.query(resolveIndexName("prompt"), ["name:x"]);
+await search.query(resolveIndexName('prompt'), ['name:x'])
 ```
 
 ### AWS OpenSearch SigV4 signing
@@ -692,7 +694,7 @@ The variable is named `ELASTICSEARCH_URL` even when the backing service is OpenS
 
 ```typescript
 if (!process.env.ELASTICSEARCH_URL && process.env.OPENSEARCH_NODE) {
-  process.env.ELASTICSEARCH_URL = process.env.OPENSEARCH_NODE;
+  process.env.ELASTICSEARCH_URL = process.env.OPENSEARCH_NODE
 }
 ```
 
@@ -741,15 +743,15 @@ When using SearchModel instances in Next.js API routes, the getter properties do
 ```typescript
 // ❌ Wrong - getters return undefined in API routes
 export async function GET() {
-  const user = await User.getById(id);
-  return NextResponse.json({ name: user.name }); // name will be undefined
+  const user = await User.getById(id)
+  return NextResponse.json({ name: user.name }) // name will be undefined
 }
 
 // ✅ Correct - use toJSON() to get the actual data
 export async function GET() {
-  const user = await User.getById(id);
-  const userData = user?.toJSON();
-  return NextResponse.json({ name: userData?.name }); // works correctly
+  const user = await User.getById(id)
+  const userData = user?.toJSON()
+  return NextResponse.json({ name: userData?.name }) // works correctly
 }
 ```
 
@@ -763,43 +765,43 @@ class User extends SearchModel {}
 
 // ✅ Correct
 class User extends SearchModel<User> {
-  static readonly indexName = "users";
+  static readonly indexName = 'users'
 }
 
 // ❌ Wrong: class property defaults bypass the decorator default pattern
 class User extends SearchModel<User> {
   @StringArrayType()
-  roles: string[] = [];
+  roles: string[] = []
 }
 
 // ✅ Correct
 class User extends SearchModel<User> {
   @StringArrayType({ default: () => [] })
-  roles!: string[];
+  roles!: string[]
 }
 
 // ✅ Correct: redeclare inherited fields for API decorators/schema visibility
 class User extends SearchModel<User> {
   @KeywordType()
-  declare id: string;
+  declare id: string
 }
 
 // ❌ Wrong: where-object queries are not supported
-await User.find({ where: { status: "active" } });
+await User.find({ where: { status: 'active' } })
 
 // ✅ Correct
-await User.find(["status:active"]);
+await User.find(['status:active'])
 
 // ❌ Wrong: update() does not save
-user.update({ status: "active" });
-return user;
+user.update({ status: 'active' })
+return user
 
 // ✅ Correct
-user.update({ status: "active" });
-await user.save();
+user.update({ status: 'active' })
+await user.save()
 
 // ❌ Wrong: assuming createIndex migrates existing mappings
-await User.createIndex();
+await User.createIndex()
 
 // ✅ Correct: treat mapping changes as schema migrations and verify them against Elasticsearch/OpenSearch
 ```
@@ -813,13 +815,11 @@ await User.createIndex();
 ### SearchService Configuration
 
 The SearchService uses the following configuration from environment variables:
-
 - `ELASTICSEARCH_URL` - Elasticsearch/OpenSearch server URL (required, no default)
 
 The service automatically handles:
-
 - Maximum retry attempts for failed requests: 3
-- Base delay for exponential backoff: 1000ms
+- Base delay for exponential backoff: 1000ms  
 - Maximum delay between retries: 30000ms
 
 ### Utility Functions
