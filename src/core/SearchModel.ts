@@ -1,9 +1,9 @@
-import 'reflect-metadata'
+import "reflect-metadata";
 import {
   search as searchService,
   SearchError,
   VersionConflictError,
-} from './SearchService'
+} from "./SearchService";
 import {
   getFieldMetadata,
   FieldMetadata,
@@ -11,124 +11,131 @@ import {
   DateType,
   NumberType,
   PRIVATE_STORAGE,
-} from '../decorators'
-import { resolveIndexName } from './indexName'
-import { encodeDocumentId } from '../utils/encodeDocumentId'
-import { id } from '../utils/id'
-import { ValidationError } from '../errors/ValidationError'
-import { log, logError, logWarn, debug } from '../utils/logging'
+} from "../decorators";
+import { resolveIndexName } from "./indexName";
+import { encodeDocumentId } from "../utils/encodeDocumentId";
+import { id } from "../utils/id";
+import { ValidationError } from "../errors/ValidationError";
+import { log, logError, logWarn, debug } from "../utils/logging";
 
 export interface SearchOptions {
-  limit?: number
-  sort?: string | Record<string, unknown>[]
-  page?: number
+  limit?: number;
+  sort?: string | Record<string, unknown>[];
+  page?: number;
 }
 
 export interface SaveEvent {
-  updated: string[]
+  updated: string[];
   // Caller-supplied context (e.g. who/why), passed through save() to the
   // lifecycle hooks. Not persisted on this model; hooks decide what to do
   // with it (for example, writing an audit Event).
-  meta?: Record<string, unknown>
+  meta?: Record<string, unknown>;
 }
 
 export interface DeleteEvent {
   /** Caller-supplied context (e.g. the acting user), as on SaveEvent. */
-  meta?: Record<string, unknown>
+  meta?: Record<string, unknown>;
 }
 
 export interface SaveOptions {
-  wait?: boolean
-  createOnly?: boolean
-  atomic?: boolean
-  meta?: Record<string, unknown>
+  wait?: boolean;
+  createOnly?: boolean;
+  atomic?: boolean;
+  meta?: Record<string, unknown>;
 }
 
 export interface DeleteOptions {
-  wait?: boolean
-  requireFound?: boolean
-  atomic?: boolean
+  wait?: boolean;
+  requireFound?: boolean;
+  atomic?: boolean;
   /** Passed to `beforeDelete` / `afterDelete` as `event.meta`. */
-  meta?: Record<string, unknown>
+  meta?: Record<string, unknown>;
 }
 
 // Deep compare for change tracking: === for primitives, element-wise for
 // arrays, own-key compare for plain objects, getTime() for Dates.
 function valuesEqual(a: unknown, b: unknown): boolean {
-  if (a === b) return true
+  if (a === b) return true;
   if (a instanceof Date || b instanceof Date) {
-    return a instanceof Date && b instanceof Date && a.getTime() === b.getTime()
+    return (
+      a instanceof Date && b instanceof Date && a.getTime() === b.getTime()
+    );
   }
-  if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') {
-    return false
+  if (
+    a === null ||
+    b === null ||
+    typeof a !== "object" ||
+    typeof b !== "object"
+  ) {
+    return false;
   }
-  if (Array.isArray(a) !== Array.isArray(b)) return false
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
   if (Array.isArray(a)) {
-    const bArr = b as unknown[]
-    if (a.length !== bArr.length) return false
+    const bArr = b as unknown[];
+    if (a.length !== bArr.length) return false;
     for (let i = 0; i < a.length; i++) {
-      if (!valuesEqual(a[i], bArr[i])) return false
+      if (!valuesEqual(a[i], bArr[i])) return false;
     }
-    return true
+    return true;
   }
-  const aObj = a as Record<string, unknown>
-  const bObj = b as Record<string, unknown>
-  const aKeys = Object.keys(aObj)
-  const bKeys = Object.keys(bObj)
-  if (aKeys.length !== bKeys.length) return false
-  return aKeys.every((k) => valuesEqual(aObj[k], bObj[k]))
+  const aObj = a as Record<string, unknown>;
+  const bObj = b as Record<string, unknown>;
+  const aKeys = Object.keys(aObj);
+  const bKeys = Object.keys(bObj);
+  if (aKeys.length !== bKeys.length) return false;
+  return aKeys.every((k) => valuesEqual(aObj[k], bObj[k]));
 }
 
 // Store a shallow copy of arrays so later in-place mutation of the live
 // array does not rewrite the recorded original value.
 function snapshotValue(value: unknown): unknown {
-  if (Array.isArray(value)) return [...value]
-  return value
+  if (Array.isArray(value)) return [...value];
+  return value;
 }
 
 // Recursively coerce every leaf of a stringMap value to a string while
 // preserving object and array structure. ES dynamic auto-mapping then indexes
 // each key, so the map stays generic and queryable by inner key at any depth.
 function stringifyMapLeaves(value: unknown): unknown {
-  if (value === null || value === undefined) return value
-  if (value instanceof Date) return value.toISOString()
-  if (Array.isArray(value)) return value.map(stringifyMapLeaves)
-  if (typeof value === 'object') {
-    const out: Record<string, unknown> = {}
+  if (value === null || value === undefined) return value;
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map(stringifyMapLeaves);
+  if (typeof value === "object") {
+    const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      out[k] = stringifyMapLeaves(v)
+      out[k] = stringifyMapLeaves(v);
     }
-    return out
+    return out;
   }
-  return String(value)
+  return String(value);
 }
 
 export abstract class SearchModel<T extends SearchModel<T>> {
   // Abstract properties that must be implemented by subclasses
-  static readonly indexName: string
+  static readonly indexName: string;
 
   // Change tracking - maps each changed field name to its original (pre-change) value
-  private _changedFields: Map<string, unknown> = new Map()
+  private _changedFields: Map<string, unknown> = new Map();
 
   // Track if this is a new document that hasn't been saved yet
-  private _isNewDocument: boolean = true
+  private _isNewDocument: boolean = true;
 
   // Elasticsearch optimistic concurrency metadata loaded by getById()
-  private _sequenceNumber?: number
-  private _primaryTerm?: number
+  private _sequenceNumber?: number;
+  private _primaryTerm?: number;
 
   // Instance properties with decorators
   @StringType({ required: true, default: () => id() })
-  public id!: string
+  public id!: string;
 
   @DateType({ required: true, default: () => new Date() })
-  public createdAt!: Date
+  public createdAt!: Date;
 
   @DateType({ required: true, default: () => new Date() })
-  public updatedAt!: Date
+  public updatedAt!: Date;
 
   @NumberType({ required: true, default: () => 1 })
-  public version!: number
+  public version!: number;
 
   // Static utility methods - removed generateId, now using ObjectID-based id() function
 
@@ -139,9 +146,9 @@ export abstract class SearchModel<T extends SearchModel<T>> {
    * unknown (undefined) original value.
    */
   protected markFieldChanged(fieldName: string): void {
-    if (['createdAt', 'updatedAt', 'version'].includes(fieldName)) return
+    if (["createdAt", "updatedAt", "version"].includes(fieldName)) return;
     if (!this._changedFields.has(fieldName)) {
-      this._changedFields.set(fieldName, undefined)
+      this._changedFields.set(fieldName, undefined);
     }
   }
 
@@ -152,20 +159,24 @@ export abstract class SearchModel<T extends SearchModel<T>> {
    * - Change back to the original value: removes the field so it is
    *   no longer considered dirty.
    */
-  protected recordFieldChange(fieldName: string, next: unknown, prev: unknown): void {
-    if (['createdAt', 'updatedAt', 'version'].includes(fieldName)) return
-    if (valuesEqual(next, prev)) return
+  protected recordFieldChange(
+    fieldName: string,
+    next: unknown,
+    prev: unknown,
+  ): void {
+    if (["createdAt", "updatedAt", "version"].includes(fieldName)) return;
+    if (valuesEqual(next, prev)) return;
     if (this._changedFields.has(fieldName)) {
       if (valuesEqual(this._changedFields.get(fieldName), next)) {
-        this._changedFields.delete(fieldName)
+        this._changedFields.delete(fieldName);
       }
-      return
+      return;
     }
-    this._changedFields.set(fieldName, snapshotValue(prev))
+    this._changedFields.set(fieldName, snapshotValue(prev));
   }
 
   protected getChangedFields(): string[] {
-    return Array.from(this._changedFields.keys())
+    return Array.from(this._changedFields.keys());
   }
 
   /**
@@ -174,25 +185,25 @@ export abstract class SearchModel<T extends SearchModel<T>> {
    * cleared after the hook runs, so the returned copy is safe to keep.
    */
   public getOriginalValues(): Record<string, unknown> {
-    const out: Record<string, unknown> = {}
+    const out: Record<string, unknown> = {};
     for (const [name, value] of this._changedFields) {
-      out[name] = value
+      out[name] = value;
     }
-    return out
+    return out;
   }
 
   protected clearChangedFields(): void {
-    this._changedFields.clear()
+    this._changedFields.clear();
   }
 
   public isNew(): boolean {
-    return this._isNewDocument
+    return this._isNewDocument;
   }
 
   // Lifecycle hooks - can be overridden by child classes
   protected async beforeSave(event: SaveEvent): Promise<boolean> {
     // Default implementation - does nothing
-    return true
+    return true;
   }
 
   protected async afterSave(event: SaveEvent): Promise<void> {
@@ -209,38 +220,40 @@ export abstract class SearchModel<T extends SearchModel<T>> {
 
   constructor(data?: Partial<T>) {
     // Parse StringMap and Date fields from JSON BEFORE setting properties to avoid validation errors
-    const fieldMetadata = getFieldMetadata(this.constructor.prototype)
-    const processedData = { ...(data as any) }
+    const fieldMetadata = getFieldMetadata(this.constructor.prototype);
+    const processedData = { ...(data as any) };
 
     // Create a map of field types for quick lookup
-    const fieldTypeMap = new Map<string, string>()
+    const fieldTypeMap = new Map<string, string>();
     for (const field of fieldMetadata) {
-      fieldTypeMap.set(field.propertyKey, field.type)
+      fieldTypeMap.set(field.propertyKey, field.type);
     }
 
     // Process special field types
     for (const field of fieldMetadata) {
-      const value = processedData[field.propertyKey]
+      const value = processedData[field.propertyKey];
 
       if (value !== undefined && value !== null) {
         // Convert date strings to Date objects
-        if (field.type === 'date' && typeof value === 'string') {
-          processedData[field.propertyKey] = new Date(value)
+        if (field.type === "date" && typeof value === "string") {
+          processedData[field.propertyKey] = new Date(value);
         }
 
         // Coerce date-only values to YYYY-MM-DD strings
-        if (field.type === 'dateOnly') {
+        if (field.type === "dateOnly") {
           if (value instanceof Date) {
-            processedData[field.propertyKey] = value.toISOString().split('T')[0]
-          } else if (typeof value === 'string' && value.includes('T')) {
-            processedData[field.propertyKey] = value.split('T')[0]
+            processedData[field.propertyKey] = value
+              .toISOString()
+              .split("T")[0];
+          } else if (typeof value === "string" && value.includes("T")) {
+            processedData[field.propertyKey] = value.split("T")[0];
           }
         }
 
         // Parse stringMap JSON strings to objects
-        if (field.type === 'stringMap' && typeof value === 'string') {
+        if (field.type === "stringMap" && typeof value === "string") {
           try {
-            processedData[field.propertyKey] = JSON.parse(value)
+            processedData[field.propertyKey] = JSON.parse(value);
           } catch (e) {
             // If JSON parsing fails, keep the original string value
             // This shouldn't happen in normal operation
@@ -250,188 +263,217 @@ export abstract class SearchModel<T extends SearchModel<T>> {
     }
 
     // Remove _model from incoming data - it's auto-set on save, not a real field
-    delete processedData._model
+    delete processedData._model;
 
     // Set each property individually to trigger setters and store in private storage
     for (const [key, value] of Object.entries(processedData)) {
-      ;(this as any)[key] = value
+      (this as any)[key] = value;
     }
 
     // If we have data with an id and version, this is an existing document
     if ((data as any)?.id && (data as any)?.version) {
-      this._isNewDocument = false
+      this._isNewDocument = false;
       // Clear change tracking since this is a load, not actual changes
-      this._changedFields.clear()
+      this._changedFields.clear();
     }
   }
 
   // Static factory method for creating instances from JSON data
   static fromJSON<T extends SearchModel<T>>(
     this: new (data?: Partial<T>) => T,
-    properties: Partial<T>
+    properties: Partial<T>,
   ): T {
     // If properties is already an instance of this class, return it as-is
     if (properties instanceof this) {
-      return properties
+      return properties;
     }
-    return new this(properties)
+    return new this(properties);
   }
 
   // Generate Elasticsearch mapping from decorator metadata
   static generateMapping<T extends SearchModel<T>>(
-    this: new (data?: Partial<T>) => T & { constructor: typeof SearchModel }
+    this: new (data?: Partial<T>) => T & { constructor: typeof SearchModel },
   ): Record<string, any> {
-    const fieldMetadata = getFieldMetadata(this.prototype)
+    const fieldMetadata = getFieldMetadata(this.prototype);
 
-    const properties: Record<string, any> = {}
+    const properties: Record<string, any> = {};
 
     for (const field of fieldMetadata) {
       // stringMap fields are left out of the mapping so Elasticsearch dynamic
       // auto-mapping indexes each (stringified) leaf key on its own, keeping
       // the map generic and queryable by inner key at any depth.
-      if (field.type === 'stringMap') continue
+      if (field.type === "stringMap") continue;
 
       // Auto-convert fields ending with "id" or "ids" to keyword type if they're currently string type
-      const fieldName = field.propertyKey
+      const fieldName = field.propertyKey;
       const shouldBeKeyword =
-        /ids?$/i.test(fieldName) && field.type === 'string'
+        /ids?$/i.test(fieldName) && field.type === "string";
 
       if (shouldBeKeyword) {
         // Create a modified field metadata with keyword type
         const keywordField: FieldMetadata = {
           ...field,
-          type: 'keyword',
-        }
+          type: "keyword",
+        };
         properties[field.propertyKey] =
-          SearchModel.getElasticsearchFieldType(keywordField)
+          SearchModel.getElasticsearchFieldType(keywordField);
       } else {
         properties[field.propertyKey] =
-          SearchModel.getElasticsearchFieldType(field)
+          SearchModel.getElasticsearchFieldType(field);
       }
     }
 
     // Always include _model as a keyword field for cross-index debugging
-    properties._model = { type: 'keyword' }
+    properties._model = { type: "keyword" };
 
     return {
       mappings: {
         properties,
       },
-    }
+    };
   }
 
   // Convert field metadata to Elasticsearch field type
   public static getElasticsearchFieldType(field: FieldMetadata): any {
-    const { type, options } = field
+    const { type, options } = field;
 
     switch (type) {
-      case 'string':
+      case "string":
         if (options && (options as any).keyword === false) {
-          return { type: 'text' }
+          return { type: "text" };
         }
-        return { type: 'text', fields: { keyword: { type: 'keyword' } } }
-      case 'keyword':
-        return { type: 'keyword', fields: { keyword: { type: 'keyword' } } }
-      case 'number':
-        return { type: 'double' }
-      case 'date':
-        return { type: 'date' }
-      case 'dateOnly':
-        return { type: 'date', format: 'strict_date' }
-      case 'boolean':
-        return { type: 'boolean' }
-      case 'stringArray':
-        return { type: 'text', fields: { keyword: { type: 'keyword' } } }
-      case 'object':
-        if (options && 'properties' in options && options.properties) {
+        return { type: "text", fields: { keyword: { type: "keyword" } } };
+      case "keyword":
+        return { type: "keyword", fields: { keyword: { type: "keyword" } } };
+      case "number":
+        return { type: "double" };
+      case "date":
+        return { type: "date" };
+      case "dateOnly":
+        return { type: "date", format: "strict_date" };
+      case "boolean":
+        return { type: "boolean" };
+      case "stringArray":
+        return { type: "text", fields: { keyword: { type: "keyword" } } };
+      case "object":
+        if (options && "properties" in options && options.properties) {
           return {
-            type: 'object',
+            type: "object",
             properties: this.buildObjectMapping(options.properties),
-          }
+          };
         }
-        return { type: 'object', enabled: false }
-      case 'objectArray':
-        if (options && 'properties' in options && options.properties) {
+        return { type: "object", enabled: false };
+      case "objectArray":
+        if (options && "properties" in options && options.properties) {
           // Use 'nested' type only if explicitly enabled via nested: true
-          const useNested = options.nested === true
+          const useNested = options.nested === true;
           return {
-            type: useNested ? 'nested' : 'object',
+            type: useNested ? "nested" : "object",
             properties: this.buildObjectMapping(options.properties),
-          }
+          };
         }
-        return { type: 'object', enabled: false }
-      case 'stringMap':
-        return { type: 'text', fields: { keyword: { type: 'keyword' } } }
-      case 'geoPoint':
-        return { type: 'geo_point' }
-      case 'vector': {
-        const dimension = (options as any)?.dimension
+        return { type: "object", enabled: false };
+      case "stringMap":
+        return { type: "text", fields: { keyword: { type: "keyword" } } };
+      case "geoPoint":
+        return { type: "geo_point" };
+      case "vector": {
+        const dimension = (options as any)?.dimension;
         if (!Number.isInteger(dimension) || dimension <= 0) {
           throw new Error(
-            `Vector field '${field.propertyKey}' dimension must be a positive integer`
-          )
+            `Vector field '${field.propertyKey}' dimension must be a positive integer`,
+          );
         }
-        return { type: 'knn_vector', dimension }
+        return { type: "knn_vector", dimension };
       }
       default:
-        return { type: 'text' }
+        return { type: "text" };
     }
   }
 
   // Build mapping for nested object properties
   public static buildObjectMapping(
-    properties: Record<string, any>
+    properties: Record<string, any>,
   ): Record<string, any> {
-    const mapping: Record<string, any> = {}
+    const mapping: Record<string, any> = {};
 
     for (const [propKey, propDef] of Object.entries(properties)) {
       // stringMap children are omitted from the mapping for the same reason
       // top-level stringMap fields are (see generateMapping): the value is an
       // object, so mapping it as text rejects it at index time. Leaving it out
       // lets Elasticsearch dynamic auto-mapping index each leaf key on its own.
-      if (propDef.type === 'stringMap') continue
+      if (propDef.type === "stringMap") continue;
 
       // Auto-convert fields ending with "id" or "ids" to keyword type if they're currently string type
       const shouldBeKeyword =
-        /ids?$/i.test(propKey) && propDef.type === 'string'
+        /ids?$/i.test(propKey) && propDef.type === "string";
 
       if (shouldBeKeyword) {
         // Create a modified property definition with keyword type
         mapping[propKey] = this.getElasticsearchFieldType({
           propertyKey: propKey,
-          type: 'keyword',
+          type: "keyword",
           options: propDef.options,
-        })
+        });
       } else {
         mapping[propKey] = this.getElasticsearchFieldType({
           propertyKey: propKey,
           type: propDef.type,
           options: propDef.options,
-        })
+        });
       }
     }
 
-    return mapping
+    return mapping;
   }
 
-  // Create or update Elasticsearch index with proper mapping
+  static async getMapping<T extends SearchModel<T>>(
+    this: new (data?: Partial<T>) => T & { constructor: typeof SearchModel },
+  ): Promise<Record<string, any>> {
+    return SearchModel.generateMapping.call(this as any).mappings;
+  }
+
+  static async updateFieldMapping<T extends SearchModel<T>>(
+    this: new (data?: Partial<T>) => T & { constructor: typeof SearchModel },
+    fieldName: string,
+  ): Promise<boolean> {
+    if (!(this as any).indexName) {
+      throw new Error(`IndexName not defined for ${this.name}`);
+    }
+
+    const mapping = await SearchModel.getMapping.call(this as any);
+    const fieldMapping = mapping.properties[fieldName];
+    if (!fieldMapping) {
+      throw new Error(`Field '${fieldName}' not defined for ${this.name}`);
+    }
+
+    const indexName = resolveIndexName((this as any).indexName);
+    const response = await searchService.searchRequest(
+      "PUT",
+      `/${indexName}/_mapping`,
+      { properties: { [fieldName]: fieldMapping } },
+    );
+
+    return response.acknowledged === true;
+  }
+
   static async createIndex<T extends SearchModel<T>>(
-    this: new (data?: Partial<T>) => T & { constructor: typeof SearchModel }
+    this: new (data?: Partial<T>) => T & { constructor: typeof SearchModel },
   ): Promise<void> {
     if (!(this as any).indexName) {
-      throw new Error(`IndexName not defined for ${this.name}`)
+      throw new Error(`IndexName not defined for ${this.name}`);
     }
-    const indexName = resolveIndexName((this as any).indexName)
+    const indexName = resolveIndexName((this as any).indexName);
 
     debug(
-      'elasticsearch',
+      "elasticsearch",
       `🔧 Creating index '${indexName}' with mappings...`,
-      { indexName }
-    )
+      { indexName },
+    );
 
     try {
       // Generate mapping from decorators
-      const mapping = SearchModel.generateMapping.call(this as any)
+      const mapping = SearchModel.generateMapping.call(this as any);
 
       // Create index with mapping and settings
       const indexConfig = {
@@ -447,29 +489,29 @@ export abstract class SearchModel<T extends SearchModel<T>> {
           },
         },
         ...mapping,
-      }
+      };
 
-      await searchService.searchRequest('PUT', `/${indexName}`, indexConfig)
-      debug('elasticsearch', `✅ Index '${indexName}' created successfully`, {
+      await searchService.searchRequest("PUT", `/${indexName}`, indexConfig);
+      debug("elasticsearch", `✅ Index '${indexName}' created successfully`, {
         indexName,
-      })
+      });
     } catch (error) {
       if (
         error instanceof SearchError &&
-        (error.message.includes('resource_already_exists_exception') ||
+        (error.message.includes("resource_already_exists_exception") ||
           (error.response &&
-            error.response.includes('resource_already_exists_exception')))
+            error.response.includes("resource_already_exists_exception")))
       ) {
         debug(
-          'search',
+          "search",
           `Index '${indexName}' already exists, skipping creation`,
           {
             indexName,
-          }
-        )
+          },
+        );
       } else {
-        logError(`Failed to create index '${indexName}'`, error, { indexName })
-        throw error
+        logError(`Failed to create index '${indexName}'`, error, { indexName });
+        throw error;
       }
     }
   }
@@ -478,9 +520,9 @@ export abstract class SearchModel<T extends SearchModel<T>> {
   static async create<T extends SearchModel<T>>(
     this: new (data?: Partial<T>) => T,
     properties: Partial<T>,
-    options: SaveOptions = {}
+    options: SaveOptions = {},
   ): Promise<T> {
-    const now = new Date()
+    const now = new Date();
 
     // Create new instance with provided properties and timestamps
     const instance = new this({
@@ -488,82 +530,82 @@ export abstract class SearchModel<T extends SearchModel<T>> {
       createdAt: now,
       updatedAt: now,
       version: 1, // New documents start with version 1
-    })
+    });
 
     // Use instance save() method to ensure proper validation and field processing
-    await instance.save(options)
-    return instance
+    await instance.save(options);
+    return instance;
   }
 
   static async find<T extends SearchModel<T>>(
     this: new (data?: Partial<T>) => T,
     terms: string[] = [],
-    options: SearchOptions = {}
+    options: SearchOptions = {},
   ): Promise<T[]> {
     if (!(this as any).indexName) {
-      throw new Error(`IndexName not defined for ${this.name}`)
+      throw new Error(`IndexName not defined for ${this.name}`);
     }
 
     try {
       const response: { hits: T[]; total: number } = await searchService.query(
         this as any,
         terms,
-        options
-      )
-      return response.hits
+        options,
+      );
+      return response.hits;
     } catch (error) {
       if (error instanceof SearchError) {
-        throw new Error(`Failed to find ${this.name}: ${error.message}`)
+        throw new Error(`Failed to find ${this.name}: ${error.message}`);
       }
-      throw error
+      throw error;
     }
   }
 
   static async findWithTotal<T extends SearchModel<T>>(
     this: new (data?: Partial<T>) => T,
     terms: string[] = [],
-    options: SearchOptions = {}
+    options: SearchOptions = {},
   ): Promise<{ hits: T[]; total: number }> {
     if (!(this as any).indexName) {
-      throw new Error(`IndexName not defined for ${this.name}`)
+      throw new Error(`IndexName not defined for ${this.name}`);
     }
     try {
-      return await searchService.query(this as any, terms, options)
+      return await searchService.query(this as any, terms, options);
     } catch (error) {
       if (error instanceof SearchError) {
-        throw new Error(`Failed to find ${this.name}: ${error.message}`)
+        throw new Error(`Failed to find ${this.name}: ${error.message}`);
       }
-      throw error
+      throw error;
     }
   }
 
   static async findOne<T extends SearchModel<T>>(
     this: new (data?: Partial<T>) => T,
-    terms: string[]
+    terms: string[],
   ): Promise<T | null> {
-    const results = await (this as any).find(terms, { limit: 1 })
-    return results.length > 0 ? results[0] : null
+    const results = await (this as any).find(terms, { limit: 1 });
+    return results.length > 0 ? results[0] : null;
   }
 
   static async getById<T extends SearchModel<T>>(
     this: new (data?: Partial<T>) => T,
-    id: string
+    id: string,
   ): Promise<T | null> {
-    return await searchService.getById(this as any, id)
+    return await searchService.getById(this as any, id);
   }
 
   // Apply default values to fields that are undefined
   private applyDefaults(): void {
-    const fieldMetadata = getFieldMetadata(this.constructor.prototype)
-    const storage = (this as any)[PRIVATE_STORAGE] || {}
+    const fieldMetadata = getFieldMetadata(this.constructor.prototype);
+    const storage = (this as any)[PRIVATE_STORAGE] || {};
 
     for (const field of fieldMetadata) {
       const value =
-        storage[field.propertyKey] ?? (this as any)[field.propertyKey]
+        storage[field.propertyKey] ?? (this as any)[field.propertyKey];
 
       // Apply default value if field is undefined and default is provided
       if (value === undefined && field.options?.default) {
-        const defaultValue = field.options.default()
+        const defaultValue = field.options.default();
         // Set directly in storage to avoid triggering the setter
         if (!(this as any)[PRIVATE_STORAGE]) {
           Object.defineProperty(this, PRIVATE_STORAGE, {
@@ -571,117 +613,120 @@ export abstract class SearchModel<T extends SearchModel<T>> {
             writable: false,
             enumerable: false,
             configurable: false,
-          })
+          });
         }
-        ;(this as any)[PRIVATE_STORAGE][field.propertyKey] = defaultValue
+        (this as any)[PRIVATE_STORAGE][field.propertyKey] = defaultValue;
       }
     }
   }
 
   // Validate required fields
   private validateRequiredFields(): void {
-    const fieldMetadata = getFieldMetadata(this.constructor.prototype)
-    const storage = (this as any)[PRIVATE_STORAGE] || {}
+    const fieldMetadata = getFieldMetadata(this.constructor.prototype);
+    const storage = (this as any)[PRIVATE_STORAGE] || {};
 
     for (const field of fieldMetadata) {
       const value =
-        storage[field.propertyKey] ?? (this as any)[field.propertyKey]
+        storage[field.propertyKey] ?? (this as any)[field.propertyKey];
 
       // Check required fields
       if (field.options?.required && (value === undefined || value === null)) {
         throw new ValidationError({
           [field.propertyKey]: `Required field '${field.propertyKey}' is missing`,
-        })
+        });
       }
     }
   }
 
   public validate(): void {
-    this.applyDefaults()
-    this.validateRequiredFields()
+    this.applyDefaults();
+    this.validateRequiredFields();
   }
 
   // Instance methods
   public async save(options: SaveOptions = {}): Promise<this> {
     debug(
-      'search',
+      "search",
       `[SearchModel.save] Starting save for ${this.constructor.name} (ID: ${this.id})`,
       {
         options,
-      }
-    )
+      },
+    );
     if (!(this.constructor as any).indexName) {
-      throw new Error(`IndexName not defined for ${this.constructor.name}`)
+      throw new Error(`IndexName not defined for ${this.constructor.name}`);
     }
-    const indexName = resolveIndexName((this.constructor as any).indexName)
+    const indexName = resolveIndexName((this.constructor as any).indexName);
 
     // Default wait to false for performance
-    const wait = options.wait ?? false
-    const createOnly = options.createOnly ?? false
-    const atomic = options.atomic ?? false
+    const wait = options.wait ?? false;
+    const createOnly = options.createOnly ?? false;
+    const atomic = options.atomic ?? false;
 
     if (createOnly && !this._isNewDocument) {
-      throw new Error('createOnly can only be used for new documents')
+      throw new Error("createOnly can only be used for new documents");
     }
     if (atomic && this._isNewDocument) {
-      throw new Error('atomic save can only be used for existing documents')
+      throw new Error("atomic save can only be used for existing documents");
     }
-    if (atomic && (this._sequenceNumber === undefined || this._primaryTerm === undefined)) {
-      throw new Error('atomic save requires a document loaded by getById')
+    if (
+      atomic &&
+      (this._sequenceNumber === undefined || this._primaryTerm === undefined)
+    ) {
+      throw new Error("atomic save requires a document loaded by getById");
     }
 
     // Get changed fields before lifecycle hooks
-    const changedFields = this.getChangedFields()
-    const saveEvent: SaveEvent = { updated: changedFields, meta: options.meta }
+    const changedFields = this.getChangedFields();
+    const saveEvent: SaveEvent = { updated: changedFields, meta: options.meta };
 
     // Call beforeSave lifecycle hook
-    const canSave = await this.beforeSave(saveEvent)
+    const canSave = await this.beforeSave(saveEvent);
     if (!canSave) {
       logWarn(
-        `[SearchModel.save] Before save hook returned false for ${this.constructor.name} (ID: ${this.id})`
-      )
-      return this
+        `[SearchModel.save] Before save hook returned false for ${this.constructor.name} (ID: ${this.id})`,
+      );
+      return this;
     }
 
     // Apply defaults after beforeSave but before validation
-    this.applyDefaults()
+    this.applyDefaults();
 
     // Validate required fields after defaults are applied
-    this.validateRequiredFields()
+    this.validateRequiredFields();
 
-    const now = new Date()
+    const now = new Date();
 
     // Store the current version for optimistic locking before modifying it
-    const currentVersion = this.version
+    const currentVersion = this.version;
 
     debug(
-      'search',
+      "search",
       `[SearchModel.save] Starting save for ${this.constructor.name} (ID: ${this.id})`,
       {
         isNewDocument: this._isNewDocument,
         currentVersionBeforeChanges: currentVersion,
         changedFields,
-      }
-    )
+      },
+    );
 
     if (this._isNewDocument) {
-      this.createdAt = now
-      this.version = 1
-      debug('search', `[SearchModel.save] New document - setting version to 1`)
+      this.createdAt = now;
+      this.version = 1;
+      debug("search", `[SearchModel.save] New document - setting version to 1`);
     } else {
       // Increment version for existing documents
-      this.version += 1
+      this.version += 1;
       debug(
-        'search',
-        `[SearchModel.save] Existing document - incrementing version from ${currentVersion} to ${this.version}`
-      )
+        "search",
+        `[SearchModel.save] Existing document - incrementing version from ${currentVersion} to ${this.version}`,
+      );
     }
-    this.updatedAt = now
+    this.updatedAt = now;
 
-    const document = this.toSearch()
+    const document = this.toSearch();
 
     debug(
-      'search',
+      "search",
       `[SearchModel.save] About to send request to Elasticsearch`,
       {
         indexName,
@@ -690,124 +735,135 @@ export abstract class SearchModel<T extends SearchModel<T>> {
         originalVersion: currentVersion,
         willUseVersionCheck: !this._isNewDocument,
         versionToSend: this._isNewDocument ? undefined : this.version,
-      }
-    )
+      },
+    );
 
     try {
       // Build the URL with optional refresh parameter
-      const refreshParam = wait ? '?refresh=wait_for' : ''
-      const operation = createOnly ? '_create' : '_doc'
-      const url = `/${indexName}/${operation}/${encodeDocumentId(this.id)}${refreshParam}`
+      const refreshParam = wait ? "?refresh=wait_for" : "";
+      const operation = createOnly ? "_create" : "_doc";
+      const url = `/${indexName}/${operation}/${encodeDocumentId(this.id)}${refreshParam}`;
 
       const result = atomic
-        ? await searchService.searchRequest('PUT', url, document, {
+        ? await searchService.searchRequest("PUT", url, document, {
             ifSeqNo: this._sequenceNumber,
             ifPrimaryTerm: this._primaryTerm,
           })
-        : await searchService.searchRequest('PUT', url, document)
+        : await searchService.searchRequest("PUT", url, document);
 
-      if (result?._seq_no !== undefined) this._sequenceNumber = result._seq_no
-      if (result?._primary_term !== undefined) this._primaryTerm = result._primary_term
+      if (result?._seq_no !== undefined) this._sequenceNumber = result._seq_no;
+      if (result?._primary_term !== undefined)
+        this._primaryTerm = result._primary_term;
 
       // If ES returned a version, update our version to match
       if (result && result._version) {
-        this.version = result._version
+        this.version = result._version;
         debug(
-          'search',
-          `[SearchModel.save] Updated version from ES response: ${result._version}`
-        )
+          "search",
+          `[SearchModel.save] Updated version from ES response: ${result._version}`,
+        );
       }
 
       // Call afterSave lifecycle hook before clearing new document flag
-      await this.afterSave(saveEvent)
+      await this.afterSave(saveEvent);
 
       // Mark as no longer a new document after afterSave has run
-      this._isNewDocument = false
+      this._isNewDocument = false;
 
       // Clear changed fields after successful save
-      this.clearChangedFields()
+      this.clearChangedFields();
 
       debug(
-        'search',
-        `[SearchModel.save] Save successful for ${this.constructor.name} (ID: ${this.id})`
-      )
-      return this
+        "search",
+        `[SearchModel.save] Save successful for ${this.constructor.name} (ID: ${this.id})`,
+      );
+      return this;
     } catch (error) {
       if (error instanceof VersionConflictError) {
         // Re-throw version conflicts with detailed version information
         const versionInfo =
           error.currentVersion && error.attemptedVersion
             ? ` Current version in DB: ${error.currentVersion}, Attempted version: ${error.attemptedVersion}, Our version before save: ${currentVersion}`
-            : ` Our version before save: ${currentVersion}`
+            : ` Our version before save: ${currentVersion}`;
 
         throw new Error(
-          `Version conflict saving ${this.constructor.name} (ID: ${this.id}): ${error.message}.${versionInfo}. Please reload and try again.`
-        )
+          `Version conflict saving ${this.constructor.name} (ID: ${this.id}): ${error.message}.${versionInfo}. Please reload and try again.`,
+        );
       }
       if (error instanceof SearchError) {
         throw new Error(
-          `Failed to save ${this.constructor.name}: ${error.message}`
-        )
+          `Failed to save ${this.constructor.name}: ${error.message}`,
+        );
       }
-      throw error
+      throw error;
     }
   }
 
   public async delete(options: DeleteOptions = {}): Promise<void> {
-    const { wait = false, requireFound = false, atomic = false, meta } = options
+    const {
+      wait = false,
+      requireFound = false,
+      atomic = false,
+      meta,
+    } = options;
 
     if (!this.id) {
-      throw new Error('Cannot delete document without ID')
+      throw new Error("Cannot delete document without ID");
     }
-    if (atomic && (this._sequenceNumber === undefined || this._primaryTerm === undefined)) {
-      throw new Error('atomic delete requires a document loaded by getById')
+    if (
+      atomic &&
+      (this._sequenceNumber === undefined || this._primaryTerm === undefined)
+    ) {
+      throw new Error("atomic delete requires a document loaded by getById");
     }
 
     if (!(this.constructor as any).indexName) {
-      throw new Error(`IndexName not defined for ${this.constructor.name}`)
+      throw new Error(`IndexName not defined for ${this.constructor.name}`);
     }
-    const indexName = resolveIndexName((this.constructor as any).indexName)
+    const indexName = resolveIndexName((this.constructor as any).indexName);
 
-    const deleteEvent: DeleteEvent = { meta }
+    const deleteEvent: DeleteEvent = { meta };
 
     // Call beforeDelete lifecycle hook
-    await this.beforeDelete(deleteEvent)
+    await this.beforeDelete(deleteEvent);
 
     try {
-      const refreshParam = wait ? '?refresh=wait_for' : ''
+      const refreshParam = wait ? "?refresh=wait_for" : "";
 
       const result = atomic
         ? await searchService.searchRequest(
-            'DELETE',
+            "DELETE",
             `/${indexName}/_doc/${encodeDocumentId(this.id)}${refreshParam}`,
             undefined,
-            { ifSeqNo: this._sequenceNumber, ifPrimaryTerm: this._primaryTerm }
+            { ifSeqNo: this._sequenceNumber, ifPrimaryTerm: this._primaryTerm },
           )
         : await searchService.searchRequest(
-            'DELETE',
-            `/${indexName}/_doc/${encodeDocumentId(this.id)}${refreshParam}`
-          )
+            "DELETE",
+            `/${indexName}/_doc/${encodeDocumentId(this.id)}${refreshParam}`,
+          );
 
-      if (requireFound && result?.result !== 'deleted') {
-        throw new Error(`${this.constructor.name} ${this.id} was not found for deletion`)
+      if (requireFound && result?.result !== "deleted") {
+        throw new Error(
+          `${this.constructor.name} ${this.id} was not found for deletion`,
+        );
       }
 
       // Call afterDelete lifecycle hook
-      await this.afterDelete(deleteEvent)
+      await this.afterDelete(deleteEvent);
     } catch (error) {
       if (error instanceof SearchError) {
-        if (error.statusCode === 404 && !requireFound) return
+        if (error.statusCode === 404 && !requireFound) return;
         throw new Error(
-          `Failed to delete ${this.constructor.name}: ${error.message}`
-        )
+          `Failed to delete ${this.constructor.name}: ${error.message}`,
+        );
       }
-      throw error
+      throw error;
     }
   }
 
   // Convert model instance to JSON for logging/debugging using field decorators
   public toJSON(): any {
-    return this.redactVectorFields(this.toSearch())
+    return this.redactVectorFields(this.toSearch());
   }
 
   /**
@@ -817,162 +873,167 @@ export abstract class SearchModel<T extends SearchModel<T>> {
    * Fields with undefined values are omitted.
    */
   public toPlain(): T {
-    const data: Record<string, any> = {}
+    const data: Record<string, any> = {};
     for (const field of getFieldMetadata(this.constructor.prototype)) {
-      const value = (this as any)[field.propertyKey]
+      const value = (this as any)[field.propertyKey];
       if (value !== undefined) {
-        data[field.propertyKey] = value
+        data[field.propertyKey] = value;
       }
     }
-    return data as T
+    return data as T;
   }
 
-  private redactVectorFields(document: Record<string, any>): Record<string, any> {
-    const fieldMetadata = getFieldMetadata(this.constructor.prototype)
-    const redacted = { ...document }
+  private redactVectorFields(
+    document: Record<string, any>,
+  ): Record<string, any> {
+    const fieldMetadata = getFieldMetadata(this.constructor.prototype);
+    const redacted = { ...document };
 
     for (const field of fieldMetadata) {
-      if (field.type !== 'vector') continue
-      if (!(field.propertyKey in redacted)) continue
+      if (field.type !== "vector") continue;
+      if (!(field.propertyKey in redacted)) continue;
 
-      const value = redacted[field.propertyKey]
+      const value = redacted[field.propertyKey];
       const dimensions = Array.isArray(value)
         ? value.length
-        : (field.options as { dimension?: number } | undefined)?.dimension
-      redacted[field.propertyKey] = `[vector: ${dimensions} dimensions]`
+        : (field.options as { dimension?: number } | undefined)?.dimension;
+      redacted[field.propertyKey] = `[vector: ${dimensions} dimensions]`;
     }
 
-    return redacted
+    return redacted;
   }
 
   // Recursively transform nested objects
   private transformObjectValue(
     value: any,
-    properties: Record<string, any>
+    properties: Record<string, any>,
   ): any {
-    if (!value || typeof value !== 'object') return value
+    if (!value || typeof value !== "object") return value;
 
-    const transformed: Record<string, any> = {}
+    const transformed: Record<string, any> = {};
 
     for (const [propKey, propDef] of Object.entries(properties)) {
-      const propValue = value[propKey]
+      const propValue = value[propKey];
 
       if (propValue !== undefined) {
         transformed[propKey] = this.transformFieldValue(
           propValue,
           propDef.type,
-          propDef.options
-        )
+          propDef.options,
+        );
       }
     }
 
-    return transformed
+    return transformed;
   }
 
   // Transform field value based on type
   private transformFieldValue(
     value: any,
     type: string,
-    options: any = {}
+    options: any = {},
   ): any {
-    if (value === undefined || value === null) return value
+    if (value === undefined || value === null) return value;
 
     switch (type) {
-      case 'date':
-        return value instanceof Date ? value.toISOString() : value
-      case 'dateOnly':
+      case "date":
+        return value instanceof Date ? value.toISOString() : value;
+      case "dateOnly":
         if (value instanceof Date) {
-          return value.toISOString().split('T')[0]
+          return value.toISOString().split("T")[0];
         }
         // Also handle string values that might have time component
-        if (typeof value === 'string' && value.includes('T')) {
-          return value.split('T')[0]
+        if (typeof value === "string" && value.includes("T")) {
+          return value.split("T")[0];
         }
-        return value
-      case 'string':
-      case 'keyword':
-        let stringValue = String(value)
-        if (options.trim) stringValue = stringValue.trim()
-        if (options.lowerCase) stringValue = stringValue.toLowerCase()
-        if (options.upperCase) stringValue = stringValue.toUpperCase()
-        return stringValue
-      case 'number':
-        return Number(value)
-      case 'boolean':
-        return Boolean(value)
-      case 'stringArray':
-        return Array.isArray(value) ? value.map(String) : []
-      case 'object':
+        return value;
+      case "string":
+      case "keyword":
+        let stringValue = String(value);
+        if (options.trim) stringValue = stringValue.trim();
+        if (options.lowerCase) stringValue = stringValue.toLowerCase();
+        if (options.upperCase) stringValue = stringValue.toUpperCase();
+        return stringValue;
+      case "number":
+        return Number(value);
+      case "boolean":
+        return Boolean(value);
+      case "stringArray":
+        return Array.isArray(value) ? value.map(String) : [];
+      case "object":
         if (options.properties) {
-          return this.transformObjectValue(value, options.properties)
+          return this.transformObjectValue(value, options.properties);
         }
-        return value
-      case 'objectArray':
+        return value;
+      case "objectArray":
         if (Array.isArray(value) && options.properties) {
           return value.map((item) =>
-            this.transformObjectValue(item, options.properties)
-          )
+            this.transformObjectValue(item, options.properties),
+          );
         }
-        return Array.isArray(value) ? value : []
-      case 'stringMap':
+        return Array.isArray(value) ? value : [];
+      case "stringMap":
         // Recurse to any depth, coercing leaf values to strings so ES dynamic
         // auto-mapping indexes each key. Object/array structure is preserved;
         // ES treats an array of strings like a string, so arrays stay arrays.
-        return stringifyMapLeaves(value)
-      case 'geoPoint':
+        return stringifyMapLeaves(value);
+      case "geoPoint":
         // Elasticsearch expects { lat: number, lon: number } format
-        return { lat: Number(value.lat), lon: Number(value.lon) }
+        return { lat: Number(value.lat), lon: Number(value.lon) };
       default:
-        return value
+        return value;
     }
   }
 
   public toString(): string {
-    return JSON.stringify(this.toJSON())
+    return JSON.stringify(this.toJSON());
   }
 
   // Update multiple properties at once without saving
   public update(data: Record<string, any>): this {
-    const fieldMetadata = getFieldMetadata(this.constructor.prototype)
-    const validFields = new Set(fieldMetadata.map((field) => field.propertyKey))
+    const fieldMetadata = getFieldMetadata(this.constructor.prototype);
+    const validFields = new Set(
+      fieldMetadata.map((field) => field.propertyKey),
+    );
 
     for (const [key, value] of Object.entries(data)) {
       // Only update properties that are valid model attributes
       if (validFields.has(key)) {
-        ;(this as any)[key] = value
+        (this as any)[key] = value;
       }
     }
 
-    return this
+    return this;
   }
 
   // Generate Elasticsearch document body based on field decorators
   public toSearch(): Record<string, any> {
-    const fieldMetadata = getFieldMetadata(this.constructor.prototype)
-    const storage = (this as any)[PRIVATE_STORAGE] || {}
-    const doc: Record<string, any> = {}
+    const fieldMetadata = getFieldMetadata(this.constructor.prototype);
+    const storage = (this as any)[PRIVATE_STORAGE] || {};
+    const doc: Record<string, any> = {};
 
     for (const field of fieldMetadata) {
       // Access value from private storage or fallback to property
-      let value = storage[field.propertyKey] ?? (this as any)[field.propertyKey]
-      const options = field.options || {}
+      let value =
+        storage[field.propertyKey] ?? (this as any)[field.propertyKey];
+      const options = field.options || {};
 
       if (value !== undefined) {
         // Transform value based on field type
-        value = this.transformFieldValue(value, field.type, options)
+        value = this.transformFieldValue(value, field.type, options);
 
         // Apply custom transform function if provided
         if (options.transform) {
-          value = options.transform(value)
+          value = options.transform(value);
         }
 
-        doc[field.propertyKey] = value
+        doc[field.propertyKey] = value;
       }
     }
 
     // Always include _model with the class name for cross-index debugging
-    doc._model = this.constructor.name
+    doc._model = this.constructor.name;
 
-    return doc
+    return doc;
   }
 }

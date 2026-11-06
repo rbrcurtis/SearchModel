@@ -1,959 +1,1027 @@
-import 'reflect-metadata'
-import { Mocked } from 'vitest'
-import { SearchModel } from '../SearchModel'
-import { StringType, NumberType, DateType, BooleanType, VectorType, StringArrayType } from '../../decorators'
-import { search, SearchError, VersionConflictError } from '../SearchService'
-import { id } from '../../utils/id'
+import "reflect-metadata";
+import { Mocked } from "vitest";
+import { SearchModel } from "../SearchModel";
+import {
+  StringType,
+  NumberType,
+  DateType,
+  BooleanType,
+  VectorType,
+  StringArrayType,
+} from "../../decorators";
+import { search, SearchError, VersionConflictError } from "../SearchService";
+import { id } from "../../utils/id";
 
 // Mock the SearchService module
-vi.mock('../SearchService', async () => {
-  const actual = await vi.importActual('../SearchService')
+vi.mock("../SearchService", async () => {
+  const actual = await vi.importActual("../SearchService");
   return {
     ...actual,
     search: {
       searchRequest: vi.fn(),
       query: vi.fn(),
-      getById: vi.fn()
-    }
-  }
-})
+      getById: vi.fn(),
+    },
+  };
+});
 
 // Type the mocked search for TypeScript
-const mockedSearch = search as Mocked<typeof search>
+const mockedSearch = search as Mocked<typeof search>;
 
 // Test model class
 class TestModel extends SearchModel<TestModel> {
-  static readonly indexName = 'test-index'
-  
+  static readonly indexName = "test-index";
+
   @StringType({ required: true })
-  name!: string
-  
+  name!: string;
+
   @NumberType()
-  score!: number
-  
+  score!: number;
+
   @DateType()
-  birthDate!: Date
-  
+  birthDate!: Date;
+
   @BooleanType()
-  isActive!: boolean
+  isActive!: boolean;
 }
 
 // Test model with lifecycle hooks
 class ModelWithHooks extends SearchModel<ModelWithHooks> {
-  static readonly indexName = 'hooks-index'
+  static readonly indexName = "hooks-index";
 
   @StringType()
-  name!: string
+  name!: string;
 
-  beforeSaveCalled = false
-  afterSaveCalled = false
-  beforeDeleteCalled = false
-  afterDeleteCalled = false
+  beforeSaveCalled = false;
+  afterSaveCalled = false;
+  beforeDeleteCalled = false;
+  afterDeleteCalled = false;
 
   protected async beforeSave(event: any): Promise<boolean> {
-    this.beforeSaveCalled = true
-    return true
+    this.beforeSaveCalled = true;
+    return true;
   }
 
   protected async afterSave(event: any): Promise<void> {
-    this.afterSaveCalled = true
+    this.afterSaveCalled = true;
   }
 
   protected async beforeDelete(event: any): Promise<void> {
-    this.beforeDeleteCalled = true
+    this.beforeDeleteCalled = true;
   }
 
   protected async afterDelete(event: any): Promise<void> {
-    this.afterDeleteCalled = true
+    this.afterDeleteCalled = true;
   }
 }
 
 class VectorSerializationModel extends SearchModel<VectorSerializationModel> {
-  static readonly indexName = 'vector-serialization-index'
+  static readonly indexName = "vector-serialization-index";
 
   @StringType()
-  name!: string
+  name!: string;
 
   @VectorType({ dimension: 3 })
-  embedding?: number[]
+  embedding?: number[];
 }
 
 // Captures the original-value map seen inside afterSave so tests can assert
 // the change log the hook would build.
 class OriginalValuesModel extends SearchModel<OriginalValuesModel> {
-  static readonly indexName = 'original-values-index'
+  static readonly indexName = "original-values-index";
 
   @StringType()
-  name!: string
+  name!: string;
 
   @NumberType()
-  score!: number
+  score!: number;
 
   @StringArrayType()
-  tags?: string[]
+  tags?: string[];
 
-  seenOriginalValues: Record<string, unknown> | null = null
+  seenOriginalValues: Record<string, unknown> | null = null;
 
   protected async afterSave(): Promise<void> {
-    this.seenOriginalValues = this.getOriginalValues()
+    this.seenOriginalValues = this.getOriginalValues();
   }
 }
 
-describe('SearchModel', () => {
+describe("SearchModel", () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    vi.clearAllMocks();
     // Reset mock functions for each test
-    mockedSearch.searchRequest.mockReset()
-    mockedSearch.query.mockReset()
-    mockedSearch.getById.mockReset()
-  })
+    mockedSearch.searchRequest.mockReset();
+    mockedSearch.query.mockReset();
+    mockedSearch.getById.mockReset();
+  });
 
-  describe('constructor', () => {
-    it('should not apply defaults in constructor (applied during save)', () => {
-      const model = new TestModel()
+  describe("constructor", () => {
+    it("should not apply defaults in constructor (applied during save)", () => {
+      const model = new TestModel();
       // Defaults are not applied in constructor - they're applied during save
-      expect(model.id).toBeUndefined()
-      expect(model.createdAt).toBeUndefined()
-      expect(model.updatedAt).toBeUndefined()
-      expect(model.version).toBeUndefined()
-    })
+      expect(model.id).toBeUndefined();
+      expect(model.createdAt).toBeUndefined();
+      expect(model.updatedAt).toBeUndefined();
+      expect(model.version).toBeUndefined();
+    });
 
-    it('should initialize with provided values', () => {
-      const testId = id()
+    it("should initialize with provided values", () => {
+      const testId = id();
       const data = {
         id: testId,
-        name: 'Test Name',
+        name: "Test Name",
         score: 100,
-        birthDate: new Date('1990-01-01'),
+        birthDate: new Date("1990-01-01"),
         isActive: true,
-        version: 2
-      }
-      
-      const model = new TestModel(data)
-      expect(model.id).toBe(testId)
-      expect(model.name).toBe('Test Name')
-      expect(model.score).toBe(100)
-      expect(model.birthDate).toEqual(new Date('1990-01-01'))
-      expect(model.isActive).toBe(true)
-      expect(model.version).toBe(2)
-    })
+        version: 2,
+      };
 
-    it('should parse date strings', () => {
-      const dateString = '2023-01-01T00:00:00.000Z'
+      const model = new TestModel(data);
+      expect(model.id).toBe(testId);
+      expect(model.name).toBe("Test Name");
+      expect(model.score).toBe(100);
+      expect(model.birthDate).toEqual(new Date("1990-01-01"));
+      expect(model.isActive).toBe(true);
+      expect(model.version).toBe(2);
+    });
+
+    it("should parse date strings", () => {
+      const dateString = "2023-01-01T00:00:00.000Z";
       const model = new TestModel({
         createdAt: dateString as any,
-        updatedAt: dateString as any
-      })
+        updatedAt: dateString as any,
+      });
 
-      expect(model.createdAt).toBeInstanceOf(Date)
-      expect(model.updatedAt).toBeInstanceOf(Date)
-    })
+      expect(model.createdAt).toBeInstanceOf(Date);
+      expect(model.updatedAt).toBeInstanceOf(Date);
+    });
 
-    it('should parse custom DateType field strings from database', () => {
+    it("should parse custom DateType field strings from database", () => {
       // Simulate loading a document from Elasticsearch where dates are ISO strings
-      const dateString = '1990-06-15T10:30:00.000Z'
+      const dateString = "1990-06-15T10:30:00.000Z";
       const model = new TestModel({
         id: id(),
-        name: 'Test User',
+        name: "Test User",
         birthDate: dateString as any, // This should be converted to Date automatically
-        version: 1
-      })
+        version: 1,
+      });
 
-      expect(model.birthDate).toBeInstanceOf(Date)
-      expect(model.birthDate.toISOString()).toBe(dateString)
-    })
+      expect(model.birthDate).toBeInstanceOf(Date);
+      expect(model.birthDate.toISOString()).toBe(dateString);
+    });
 
-    it('should parse all date fields from database response', () => {
+    it("should parse all date fields from database response", () => {
       // Simulate a full document from Elasticsearch
-      const createdAtString = '2023-01-01T00:00:00.000Z'
-      const updatedAtString = '2023-06-01T12:00:00.000Z'
-      const birthDateString = '1985-03-20T08:15:00.000Z'
+      const createdAtString = "2023-01-01T00:00:00.000Z";
+      const updatedAtString = "2023-06-01T12:00:00.000Z";
+      const birthDateString = "1985-03-20T08:15:00.000Z";
 
       const model = new TestModel({
         id: id(),
-        name: 'Test User',
+        name: "Test User",
         createdAt: createdAtString as any,
         updatedAt: updatedAtString as any,
         birthDate: birthDateString as any,
-        version: 5
-      })
+        version: 5,
+      });
 
       // All date fields should be converted to Date objects
-      expect(model.createdAt).toBeInstanceOf(Date)
-      expect(model.updatedAt).toBeInstanceOf(Date)
-      expect(model.birthDate).toBeInstanceOf(Date)
+      expect(model.createdAt).toBeInstanceOf(Date);
+      expect(model.updatedAt).toBeInstanceOf(Date);
+      expect(model.birthDate).toBeInstanceOf(Date);
 
       // Verify the values match
-      expect(model.createdAt.toISOString()).toBe(createdAtString)
-      expect(model.updatedAt.toISOString()).toBe(updatedAtString)
-      expect(model.birthDate.toISOString()).toBe(birthDateString)
-    })
-  })
+      expect(model.createdAt.toISOString()).toBe(createdAtString);
+      expect(model.updatedAt.toISOString()).toBe(updatedAtString);
+      expect(model.birthDate.toISOString()).toBe(birthDateString);
+    });
+  });
 
-  describe('fromJSON', () => {
-    it('should create instance from JSON data', () => {
-      const testId = id()
+  describe("fromJSON", () => {
+    it("should create instance from JSON data", () => {
+      const testId = id();
       const data = {
         id: testId,
-        name: 'Test',
-        score: 50
-      }
-      
-      const model = TestModel.fromJSON(data)
-      expect(model).toBeInstanceOf(TestModel)
-      expect(model.id).toBe(testId)
-      expect(model.name).toBe('Test')
-      expect(model.score).toBe(50)
-    })
+        name: "Test",
+        score: 50,
+      };
 
-    it('should return existing instance if passed', () => {
-      const existing = new TestModel({ name: 'Existing' })
-      const result = TestModel.fromJSON(existing)
-      expect(result).toBe(existing)
-    })
-  })
+      const model = TestModel.fromJSON(data);
+      expect(model).toBeInstanceOf(TestModel);
+      expect(model.id).toBe(testId);
+      expect(model.name).toBe("Test");
+      expect(model.score).toBe(50);
+    });
 
-  describe('generateMapping', () => {
-    it('should generate correct Elasticsearch mapping', () => {
-      const mapping = SearchModel.generateMapping.call(TestModel as any)
-      
-      expect(mapping).toHaveProperty('mappings')
-      expect(mapping.mappings).toHaveProperty('properties')
-      
-      const properties = mapping.mappings.properties
-      expect(properties.id).toEqual({ type: 'keyword', fields: { keyword: { type: 'keyword' } } })
-      expect(properties.name).toEqual({ 
-        type: 'text', 
-        fields: { keyword: { type: 'keyword' } } 
-      })
-      expect(properties.score).toEqual({ type: 'double' })
-      expect(properties.birthDate).toEqual({ type: 'date' })
-      expect(properties.isActive).toEqual({ type: 'boolean' })
-    })
-  })
+    it("should return existing instance if passed", () => {
+      const existing = new TestModel({ name: "Existing" });
+      const result = TestModel.fromJSON(existing);
+      expect(result).toBe(existing);
+    });
+  });
 
-  describe('getElasticsearchFieldType', () => {
-    it('should convert string type correctly', () => {
+  describe("generateMapping", () => {
+    it("should generate correct Elasticsearch mapping", () => {
+      const mapping = SearchModel.generateMapping.call(TestModel as any);
+
+      expect(mapping).toHaveProperty("mappings");
+      expect(mapping.mappings).toHaveProperty("properties");
+
+      const properties = mapping.mappings.properties;
+      expect(properties.id).toEqual({
+        type: "keyword",
+        fields: { keyword: { type: "keyword" } },
+      });
+      expect(properties.name).toEqual({
+        type: "text",
+        fields: { keyword: { type: "keyword" } },
+      });
+      expect(properties.score).toEqual({ type: "double" });
+      expect(properties.birthDate).toEqual({ type: "date" });
+      expect(properties.isActive).toEqual({ type: "boolean" });
+    });
+  });
+
+  describe("getElasticsearchFieldType", () => {
+    it("should convert string type correctly", () => {
       const result = SearchModel.getElasticsearchFieldType({
-        propertyKey: 'test',
-        type: 'string',
-        options: {}
-      })
-      expect(result).toEqual({ 
-        type: 'text', 
-        fields: { keyword: { type: 'keyword' } } 
-      })
-    })
+        propertyKey: "test",
+        type: "string",
+        options: {},
+      });
+      expect(result).toEqual({
+        type: "text",
+        fields: { keyword: { type: "keyword" } },
+      });
+    });
 
-    it('should convert keyword type correctly', () => {
+    it("should convert keyword type correctly", () => {
       const result = SearchModel.getElasticsearchFieldType({
-        propertyKey: 'test',
-        type: 'keyword',
-        options: {}
-      })
-      expect(result).toEqual({ type: 'keyword', fields: { keyword: { type: 'keyword' } } })
-    })
+        propertyKey: "test",
+        type: "keyword",
+        options: {},
+      });
+      expect(result).toEqual({
+        type: "keyword",
+        fields: { keyword: { type: "keyword" } },
+      });
+    });
 
-    it('should convert number type correctly', () => {
+    it("should convert number type correctly", () => {
       const result = SearchModel.getElasticsearchFieldType({
-        propertyKey: 'test',
-        type: 'number',
-        options: {}
-      })
-      expect(result).toEqual({ type: 'double' })
-    })
+        propertyKey: "test",
+        type: "number",
+        options: {},
+      });
+      expect(result).toEqual({ type: "double" });
+    });
 
-    it('should convert date type correctly', () => {
+    it("should convert date type correctly", () => {
       const result = SearchModel.getElasticsearchFieldType({
-        propertyKey: 'test',
-        type: 'date',
-        options: {}
-      })
-      expect(result).toEqual({ type: 'date' })
-    })
-  })
+        propertyKey: "test",
+        type: "date",
+        options: {},
+      });
+      expect(result).toEqual({ type: "date" });
+    });
+  });
 
-  describe('createIndex', () => {
-    it('should create index with correct mapping', async () => {
-      mockedSearch.searchRequest.mockResolvedValue({})
-      
-      await SearchModel.createIndex.call(TestModel as any)
-      
+  describe("mapping management", () => {
+    it("returns the generated mapping body", async () => {
+      await expect(TestModel.getMapping()).resolves.toEqual(
+        TestModel.generateMapping().mappings,
+      );
+    });
+
+    it("adds one generated field mapping to the resolved index", async () => {
+      mockedSearch.searchRequest.mockResolvedValue({ acknowledged: true });
+
+      await expect(TestModel.updateFieldMapping("score")).resolves.toBe(true);
+
       expect(search.searchRequest).toHaveBeenCalledWith(
-        'PUT',
-        '/test-index',
+        "PUT",
+        "/test-index/_mapping",
+        { properties: { score: { type: "double" } } },
+      );
+    });
+
+    it("rejects a field that is not defined on the model", async () => {
+      await expect(TestModel.updateFieldMapping("missing")).rejects.toThrow(
+        "Field 'missing' not defined for TestModel",
+      );
+      expect(search.searchRequest).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("createIndex", () => {
+    it("should create index with correct mapping", async () => {
+      mockedSearch.searchRequest.mockResolvedValue({});
+
+      await SearchModel.createIndex.call(TestModel as any);
+
+      expect(search.searchRequest).toHaveBeenCalledWith(
+        "PUT",
+        "/test-index",
         expect.objectContaining({
           settings: expect.any(Object),
-          mappings: expect.any(Object)
-        })
-      )
-    })
+          mappings: expect.any(Object),
+        }),
+      );
+    });
 
-    it('should handle existing index gracefully', async () => {
-      const error = new SearchError('resource_already_exists_exception')
-      error.response = 'Index already exists: resource_already_exists_exception'
-      mockedSearch.searchRequest.mockRejectedValue(error)
-      
+    it("should handle existing index gracefully", async () => {
+      const error = new SearchError("resource_already_exists_exception");
+      error.response =
+        "Index already exists: resource_already_exists_exception";
+      mockedSearch.searchRequest.mockRejectedValue(error);
+
       // createIndex should not throw when index already exists - it catches this specific error
-      await SearchModel.createIndex.call(TestModel as any)
-      expect(search.searchRequest).toHaveBeenCalled()
-    })
+      await SearchModel.createIndex.call(TestModel as any);
+      expect(search.searchRequest).toHaveBeenCalled();
+    });
 
-    it('should throw error when indexName is not defined', async () => {
+    it("should throw error when indexName is not defined", async () => {
       class NoIndexModel extends SearchModel<NoIndexModel> {
         // No indexName defined
       }
 
-      await expect(SearchModel.createIndex.call(NoIndexModel as any))
-        .rejects.toThrow('IndexName not defined for NoIndexModel')
-    })
-  })
+      await expect(
+        SearchModel.createIndex.call(NoIndexModel as any),
+      ).rejects.toThrow("IndexName not defined for NoIndexModel");
+    });
+  });
 
-  describe('save', () => {
-    it('should save new document', async () => {
-      const testId = id()
+  describe("save", () => {
+    it("should save new document", async () => {
+      const testId = id();
       mockedSearch.searchRequest.mockResolvedValue({
         _id: testId,
-        _version: 1
-      })
-      
-      const model = new TestModel({ id: testId, name: 'Test' })
-      const result = await model.save()
-      
+        _version: 1,
+      });
+
+      const model = new TestModel({ id: testId, name: "Test" });
+      const result = await model.save();
+
       expect(search.searchRequest).toHaveBeenCalledWith(
-        'PUT',
+        "PUT",
         `/test-index/_doc/${testId}`,
         expect.objectContaining({
           id: testId,
-          name: 'Test'
-        })
-      )
-      expect(result).toBe(model)
-    })
+          name: "Test",
+        }),
+      );
+      expect(result).toBe(model);
+    });
 
-    it('should create a document without overwriting an existing id when requested', async () => {
-      const testId = id()
+    it("should create a document without overwriting an existing id when requested", async () => {
+      const testId = id();
       mockedSearch.searchRequest.mockResolvedValue({
         _id: testId,
-        _version: 1
-      })
+        _version: 1,
+      });
 
-      const model = new TestModel({ id: testId, name: 'Test' })
-      await model.save({ createOnly: true, wait: true })
+      const model = new TestModel({ id: testId, name: "Test" });
+      await model.save({ createOnly: true, wait: true });
 
       expect(search.searchRequest).toHaveBeenCalledWith(
-        'PUT',
+        "PUT",
         `/test-index/_create/${testId}?refresh=wait_for`,
-        expect.objectContaining({ id: testId, name: 'Test' })
-      )
-    })
+        expect.objectContaining({ id: testId, name: "Test" }),
+      );
+    });
 
-    it('should reject createOnly for a loaded document', async () => {
+    it("should reject createOnly for a loaded document", async () => {
       const model = new TestModel({
         id: id(),
-        name: 'Test',
+        name: "Test",
         version: 2,
         createdAt: new Date(),
-        updatedAt: new Date()
-      })
+        updatedAt: new Date(),
+      });
 
       await expect(model.save({ createOnly: true })).rejects.toThrow(
-        'createOnly can only be used for new documents'
-      )
-    })
+        "createOnly can only be used for new documents",
+      );
+    });
 
-    it('should save atomically with loaded sequence metadata', async () => {
-      const testId = id()
+    it("should save atomically with loaded sequence metadata", async () => {
+      const testId = id();
       mockedSearch.searchRequest.mockResolvedValue({
         _id: testId,
         _version: 8,
         _seq_no: 13,
-        _primary_term: 3
-      })
+        _primary_term: 3,
+      });
 
       const model = TestModel.fromJSON({
         id: testId,
-        name: 'Test',
+        name: "Test",
         version: 7,
         createdAt: new Date(),
         updatedAt: new Date(),
         _sequenceNumber: 12,
-        _primaryTerm: 3
-      } as never)
-      await model.save({ atomic: true })
+        _primaryTerm: 3,
+      } as never);
+      await model.save({ atomic: true });
 
       expect(search.searchRequest).toHaveBeenCalledWith(
-        'PUT',
+        "PUT",
         `/test-index/_doc/${testId}`,
-        expect.objectContaining({ id: testId, name: 'Test' }),
-        { ifSeqNo: 12, ifPrimaryTerm: 3 }
-      )
-    })
+        expect.objectContaining({ id: testId, name: "Test" }),
+        { ifSeqNo: 12, ifPrimaryTerm: 3 },
+      );
+    });
 
-    it('should update existing document', async () => {
-      const testId = id()
+    it("should update existing document", async () => {
+      const testId = id();
       mockedSearch.searchRequest.mockResolvedValue({
         _id: testId,
-        _version: 2
-      })
-      
-      const model = new TestModel({ 
-        id: testId, 
-        name: 'Test',
+        _version: 2,
+      });
+
+      const model = new TestModel({
+        id: testId,
+        name: "Test",
         version: 1,
         createdAt: new Date(),
-        updatedAt: new Date()
-      })
-      
-      await model.save()
-      
-      expect(search.searchRequest).toHaveBeenCalled()
-      expect(model.version).toBe(2)
-    })
+        updatedAt: new Date(),
+      });
 
-    it('should handle version conflicts', async () => {
-      const testId = id()
-      const versionError = new VersionConflictError(
-        'Version conflict',
-        2,
-        1
-      )
-      mockedSearch.searchRequest.mockRejectedValue(versionError)
-      
-      const model = new TestModel({ 
+      await model.save();
+
+      expect(search.searchRequest).toHaveBeenCalled();
+      expect(model.version).toBe(2);
+    });
+
+    it("should handle version conflicts", async () => {
+      const testId = id();
+      const versionError = new VersionConflictError("Version conflict", 2, 1);
+      mockedSearch.searchRequest.mockRejectedValue(versionError);
+
+      const model = new TestModel({
         id: testId,
-        name: 'Test',
-        version: 1
-      })
-      
-      await expect(model.save()).rejects.toThrow(/Version conflict/)
-    })
+        name: "Test",
+        version: 1,
+      });
 
-    it('should call lifecycle hooks', async () => {
-      const testId = id()
+      await expect(model.save()).rejects.toThrow(/Version conflict/);
+    });
+
+    it("should call lifecycle hooks", async () => {
+      const testId = id();
       mockedSearch.searchRequest.mockResolvedValue({
         _id: testId,
-        _version: 1
-      })
-      
-      const model = new ModelWithHooks({ id: testId, name: 'Test' })
-      
-      expect(model.beforeSaveCalled).toBe(false)
-      expect(model.afterSaveCalled).toBe(false)
-      
-      await model.save()
-      
-      expect(model.beforeSaveCalled).toBe(true)
-      expect(model.afterSaveCalled).toBe(true)
-    })
+        _version: 1,
+      });
 
-    it('should respect wait option', async () => {
-      const testId = id()
+      const model = new ModelWithHooks({ id: testId, name: "Test" });
+
+      expect(model.beforeSaveCalled).toBe(false);
+      expect(model.afterSaveCalled).toBe(false);
+
+      await model.save();
+
+      expect(model.beforeSaveCalled).toBe(true);
+      expect(model.afterSaveCalled).toBe(true);
+    });
+
+    it("should respect wait option", async () => {
+      const testId = id();
       mockedSearch.searchRequest.mockResolvedValue({
         _id: testId,
-        _version: 1
-      })
+        _version: 1,
+      });
 
-      const model = new TestModel({ id: testId, name: 'Test' })
+      const model = new TestModel({ id: testId, name: "Test" });
 
       // Test with wait: false
-      await model.save({ wait: false })
+      await model.save({ wait: false });
       expect(search.searchRequest).toHaveBeenCalledWith(
-        'PUT',
+        "PUT",
         `/test-index/_doc/${testId}`,
-        expect.any(Object)
-      )
+        expect.any(Object),
+      );
 
-      mockedSearch.searchRequest.mockClear()
+      mockedSearch.searchRequest.mockClear();
 
       // Test with wait: true (explicit)
-      await model.save({ wait: true })
+      await model.save({ wait: true });
       expect(search.searchRequest).toHaveBeenCalledWith(
-        'PUT',
+        "PUT",
         `/test-index/_doc/${testId}?refresh=wait_for`,
-        expect.any(Object)
-      )
-    })
+        expect.any(Object),
+      );
+    });
 
-    it('should save raw vector values even when toJSON redacts them', async () => {
+    it("should save raw vector values even when toJSON redacts them", async () => {
       mockedSearch.searchRequest.mockResolvedValue({
         _id: id(),
         _version: 1,
-      })
+      });
 
       const model = new VectorSerializationModel({
-        name: 'Vector Test',
+        name: "Vector Test",
         embedding: [0.1, 0.2, 0.3],
-      })
+      });
 
-      await model.save()
+      await model.save();
 
       expect(search.searchRequest).toHaveBeenCalledWith(
-        'PUT',
-        expect.stringContaining('/vector-serialization-index/_doc/'),
+        "PUT",
+        expect.stringContaining("/vector-serialization-index/_doc/"),
         expect.objectContaining({
-          name: 'Vector Test',
+          name: "Vector Test",
           embedding: [0.1, 0.2, 0.3],
-        })
-      )
-    })
-  })
+        }),
+      );
+    });
+  });
 
-  describe('delete', () => {
-    it('should delete document', async () => {
-      const testId = id()
-      mockedSearch.searchRequest.mockResolvedValue({})
-      
-      const model = new TestModel({ id: testId, name: 'Test' })
-      await model.delete()
-      
-      expect(search.searchRequest).toHaveBeenCalledWith(
-        'DELETE',
-        `/test-index/_doc/${testId}`
-      )
-    })
+  describe("delete", () => {
+    it("should delete document", async () => {
+      const testId = id();
+      mockedSearch.searchRequest.mockResolvedValue({});
 
-    it('should respect wait option', async () => {
-      const testId = id()
-      mockedSearch.searchRequest.mockResolvedValue({})
-
-      const model = new TestModel({ id: testId, name: 'Test' })
-      await model.delete({ wait: true })
+      const model = new TestModel({ id: testId, name: "Test" });
+      await model.delete();
 
       expect(search.searchRequest).toHaveBeenCalledWith(
-        'DELETE',
-        `/test-index/_doc/${testId}?refresh=wait_for`
-      )
-    })
+        "DELETE",
+        `/test-index/_doc/${testId}`,
+      );
+    });
 
-    it('should delete atomically with loaded sequence metadata', async () => {
-      const testId = id()
-      mockedSearch.searchRequest.mockResolvedValue({ result: 'deleted' })
+    it("should respect wait option", async () => {
+      const testId = id();
+      mockedSearch.searchRequest.mockResolvedValue({});
+
+      const model = new TestModel({ id: testId, name: "Test" });
+      await model.delete({ wait: true });
+
+      expect(search.searchRequest).toHaveBeenCalledWith(
+        "DELETE",
+        `/test-index/_doc/${testId}?refresh=wait_for`,
+      );
+    });
+
+    it("should delete atomically with loaded sequence metadata", async () => {
+      const testId = id();
+      mockedSearch.searchRequest.mockResolvedValue({ result: "deleted" });
 
       const model = TestModel.fromJSON({
         id: testId,
-        name: 'Test',
+        name: "Test",
         version: 7,
         _sequenceNumber: 12,
-        _primaryTerm: 3
-      } as never)
-      await model.delete({ atomic: true })
+        _primaryTerm: 3,
+      } as never);
+      await model.delete({ atomic: true });
 
       expect(search.searchRequest).toHaveBeenCalledWith(
-        'DELETE',
+        "DELETE",
         `/test-index/_doc/${testId}`,
         undefined,
-        { ifSeqNo: 12, ifPrimaryTerm: 3 }
-      )
-    })
+        { ifSeqNo: 12, ifPrimaryTerm: 3 },
+      );
+    });
 
-    it('should treat a missing document as already deleted by default', async () => {
-      const testId = id()
-      mockedSearch.searchRequest.mockRejectedValue(new SearchError('Not found', 404))
+    it("should treat a missing document as already deleted by default", async () => {
+      const testId = id();
+      mockedSearch.searchRequest.mockRejectedValue(
+        new SearchError("Not found", 404),
+      );
 
-      const model = new TestModel({ id: testId, name: 'Test' })
+      const model = new TestModel({ id: testId, name: "Test" });
 
-      await expect(model.delete()).resolves.toBeUndefined()
-    })
+      await expect(model.delete()).resolves.toBeUndefined();
+    });
 
-    it('should require the document to exist when requested', async () => {
-      const testId = id()
-      mockedSearch.searchRequest.mockResolvedValue({ result: 'not_found' })
+    it("should require the document to exist when requested", async () => {
+      const testId = id();
+      mockedSearch.searchRequest.mockResolvedValue({ result: "not_found" });
 
-      const model = new TestModel({ id: testId, name: 'Test' })
+      const model = new TestModel({ id: testId, name: "Test" });
 
       await expect(model.delete({ requireFound: true })).rejects.toThrow(
-        `TestModel ${testId} was not found for deletion`
-      )
-    })
+        `TestModel ${testId} was not found for deletion`,
+      );
+    });
 
-    it('should accept a confirmed deletion when existence is required', async () => {
-      const testId = id()
-      mockedSearch.searchRequest.mockResolvedValue({ result: 'deleted' })
+    it("should accept a confirmed deletion when existence is required", async () => {
+      const testId = id();
+      mockedSearch.searchRequest.mockResolvedValue({ result: "deleted" });
 
-      const model = new TestModel({ id: testId, name: 'Test' })
-      await expect(model.delete({ requireFound: true })).resolves.toBeUndefined()
-    })
+      const model = new TestModel({ id: testId, name: "Test" });
+      await expect(
+        model.delete({ requireFound: true }),
+      ).resolves.toBeUndefined();
+    });
 
-    it('should throw error when id is missing', async () => {
-      const model = new TestModel()
-      model.id = undefined as any
+    it("should throw error when id is missing", async () => {
+      const model = new TestModel();
+      model.id = undefined as any;
 
-      await expect(model.delete()).rejects.toThrow('Cannot delete document without ID')
-    })
+      await expect(model.delete()).rejects.toThrow(
+        "Cannot delete document without ID",
+      );
+    });
 
-    it('should throw error when indexName is not defined', async () => {
+    it("should throw error when indexName is not defined", async () => {
       class NoIndexModel extends SearchModel<NoIndexModel> {
         // No indexName defined
       }
 
-      const model = new NoIndexModel({ id: id() })
-      await expect(model.delete()).rejects.toThrow('IndexName not defined')
-    })
+      const model = new NoIndexModel({ id: id() });
+      await expect(model.delete()).rejects.toThrow("IndexName not defined");
+    });
 
-    it('should call lifecycle hooks', async () => {
-      const testId = id()
-      mockedSearch.searchRequest.mockResolvedValue({})
-      
-      const model = new ModelWithHooks({ id: testId, name: 'Test' })
-      
-      expect(model.beforeDeleteCalled).toBe(false)
-      expect(model.afterDeleteCalled).toBe(false)
-      
-      await model.delete()
-      
-      expect(model.beforeDeleteCalled).toBe(true)
-      expect(model.afterDeleteCalled).toBe(true)
-    })
-  })
+    it("should call lifecycle hooks", async () => {
+      const testId = id();
+      mockedSearch.searchRequest.mockResolvedValue({});
 
-  describe('static methods', () => {
-    describe('create', () => {
-      it('should create and save new document', async () => {
-        const testId = id()
+      const model = new ModelWithHooks({ id: testId, name: "Test" });
+
+      expect(model.beforeDeleteCalled).toBe(false);
+      expect(model.afterDeleteCalled).toBe(false);
+
+      await model.delete();
+
+      expect(model.beforeDeleteCalled).toBe(true);
+      expect(model.afterDeleteCalled).toBe(true);
+    });
+  });
+
+  describe("static methods", () => {
+    describe("create", () => {
+      it("should create and save new document", async () => {
+        const testId = id();
         mockedSearch.searchRequest.mockResolvedValue({
           _id: testId,
-          _version: 1
-        })
-        
-        const result = await TestModel.create({ id: testId, name: 'New' })
-        
-        expect(result).toBeInstanceOf(TestModel)
-        expect(result.name).toBe('New')
-        expect(search.searchRequest).toHaveBeenCalled()
-      })
+          _version: 1,
+        });
 
-      it('should pass options to save', async () => {
-        const testId = id()
+        const result = await TestModel.create({ id: testId, name: "New" });
+
+        expect(result).toBeInstanceOf(TestModel);
+        expect(result.name).toBe("New");
+        expect(search.searchRequest).toHaveBeenCalled();
+      });
+
+      it("should pass options to save", async () => {
+        const testId = id();
         mockedSearch.searchRequest.mockResolvedValue({
           _id: testId,
-          _version: 1
-        })
-        
-        await TestModel.create({ id: testId, name: 'New' }, { wait: false })
-        
+          _version: 1,
+        });
+
+        await TestModel.create({ id: testId, name: "New" }, { wait: false });
+
         expect(search.searchRequest).toHaveBeenCalledWith(
-          'PUT',
+          "PUT",
           expect.stringMatching(/^\/test-index\/_doc\/[^?]+$/),
-          expect.any(Object)
-        )
-      })
-    })
-    
-    describe('find', () => {
-      it('should find documents', async () => {
+          expect.any(Object),
+        );
+      });
+    });
+
+    describe("find", () => {
+      it("should find documents", async () => {
         mockedSearch.query.mockResolvedValue({
           hits: [
-            TestModel.fromJSON({ id: id(), name: 'Result 1', version: 1 } as any),
-            TestModel.fromJSON({ id: id(), name: 'Result 2', version: 1 } as any),
+            TestModel.fromJSON({
+              id: id(),
+              name: "Result 1",
+              version: 1,
+            } as any),
+            TestModel.fromJSON({
+              id: id(),
+              name: "Result 2",
+              version: 1,
+            } as any),
           ],
-          total: 2
-        })
-        
-        const results = await TestModel.find(['name:Test'])
-        
-        expect(search.query).toHaveBeenCalledWith(
-          TestModel,
-          ['name:Test'],
-          {}
-        )
-        expect(results).toHaveLength(2)
-        expect(results[0]).toBeInstanceOf(TestModel)
-      })
-      
-      it('should pass options to query', async () => {
+          total: 2,
+        });
+
+        const results = await TestModel.find(["name:Test"]);
+
+        expect(search.query).toHaveBeenCalledWith(TestModel, ["name:Test"], {});
+        expect(results).toHaveLength(2);
+        expect(results[0]).toBeInstanceOf(TestModel);
+      });
+
+      it("should pass options to query", async () => {
         mockedSearch.query.mockResolvedValue({
           hits: [],
-          total: 0
-        })
-        
-        await TestModel.find(['test'], { limit: 10, sort: 'name:desc' })
-        
-        expect(search.query).toHaveBeenCalledWith(
-          TestModel,
-          ['test'],
-          { limit: 10, sort: 'name:desc' }
-        )
-      })
-    })
-    
-    describe('findWithTotal', () => {
-      it('should return hits and total', async () => {
+          total: 0,
+        });
+
+        await TestModel.find(["test"], { limit: 10, sort: "name:desc" });
+
+        expect(search.query).toHaveBeenCalledWith(TestModel, ["test"], {
+          limit: 10,
+          sort: "name:desc",
+        });
+      });
+    });
+
+    describe("findWithTotal", () => {
+      it("should return hits and total", async () => {
         const hits = [
-          { id: id(), name: 'Result 1' },
-          { id: id(), name: 'Result 2' }
-        ]
-        mockedSearch.query.mockResolvedValue({ hits, total: 42 })
-        
-        const result = await TestModel.findWithTotal(['test'])
-        
-        expect(result.hits).toEqual(hits)
-        expect(result.total).toBe(42)
-      })
+          { id: id(), name: "Result 1" },
+          { id: id(), name: "Result 2" },
+        ];
+        mockedSearch.query.mockResolvedValue({ hits, total: 42 });
 
-      it('wraps an async query rejection in a find error', async () => {
-        const { SearchError } = await vi.importActual<typeof import('../SearchService')>(
-          '../SearchService'
-        )
-        mockedSearch.query.mockRejectedValue(new SearchError('boom'))
+        const result = await TestModel.findWithTotal(["test"]);
 
-        await expect(TestModel.findWithTotal(['test'])).rejects.toThrow(
-          'Failed to find TestModel: boom'
-        )
-      })
-    })
-    
-    describe('findOne', () => {
-      it('should find first matching document', async () => {
-        const testDoc = { id: id(), name: 'First' }
-        vi.spyOn(TestModel, 'find').mockResolvedValue([
-          new TestModel(testDoc)
-        ])
-        
-        const result = await TestModel.findOne(['name:First'])
-        
-        expect(result).toBeInstanceOf(TestModel)
-        expect(result?.name).toBe('First')
-      })
-      
-      it('should return null when no documents found', async () => {
-        vi.spyOn(TestModel, 'find').mockResolvedValue([])
-        
-        const result = await TestModel.findOne(['name:NotFound'])
-        
-        expect(result).toBeNull()
-      })
-    })
-    
-    describe('getById', () => {
-      it('should get document by ID', async () => {
-        const testId = id()
+        expect(result.hits).toEqual(hits);
+        expect(result.total).toBe(42);
+      });
+
+      it("wraps an async query rejection in a find error", async () => {
+        const { SearchError } =
+          await vi.importActual<typeof import("../SearchService")>(
+            "../SearchService",
+          );
+        mockedSearch.query.mockRejectedValue(new SearchError("boom"));
+
+        await expect(TestModel.findWithTotal(["test"])).rejects.toThrow(
+          "Failed to find TestModel: boom",
+        );
+      });
+    });
+
+    describe("findOne", () => {
+      it("should find first matching document", async () => {
+        const testDoc = { id: id(), name: "First" };
+        vi.spyOn(TestModel, "find").mockResolvedValue([new TestModel(testDoc)]);
+
+        const result = await TestModel.findOne(["name:First"]);
+
+        expect(result).toBeInstanceOf(TestModel);
+        expect(result?.name).toBe("First");
+      });
+
+      it("should return null when no documents found", async () => {
+        vi.spyOn(TestModel, "find").mockResolvedValue([]);
+
+        const result = await TestModel.findOne(["name:NotFound"]);
+
+        expect(result).toBeNull();
+      });
+    });
+
+    describe("getById", () => {
+      it("should get document by ID", async () => {
+        const testId = id();
         mockedSearch.getById.mockResolvedValue(
-          new TestModel({ id: testId, name: 'Test' })
-        )
-        
-        const result = await TestModel.getById(testId)
-        
-        expect(search.getById).toHaveBeenCalledWith(TestModel, testId)
-        expect(result).toBeInstanceOf(TestModel)
-      })
-      
-      it('should return null when document not found', async () => {
-        const nonExistentId = id()
-        mockedSearch.getById.mockResolvedValue(null)
-        
-        const result = await TestModel.getById(nonExistentId)
-        
-        expect(result).toBeNull()
-      })
-    })
-  })
+          new TestModel({ id: testId, name: "Test" }),
+        );
 
-  describe('change tracking', () => {
-    it('should track field changes', () => {
-      const model = new TestModel()
-      model['markFieldChanged']('name')
-      model['markFieldChanged']('score')
-      
-      const changed = model['getChangedFields']()
-      expect(changed).toContain('name')
-      expect(changed).toContain('score')
-    })
+        const result = await TestModel.getById(testId);
 
-    it('should clear changed fields after save', async () => {
-      const testId = id()
+        expect(search.getById).toHaveBeenCalledWith(TestModel, testId);
+        expect(result).toBeInstanceOf(TestModel);
+      });
+
+      it("should return null when document not found", async () => {
+        const nonExistentId = id();
+        mockedSearch.getById.mockResolvedValue(null);
+
+        const result = await TestModel.getById(nonExistentId);
+
+        expect(result).toBeNull();
+      });
+    });
+  });
+
+  describe("change tracking", () => {
+    it("should track field changes", () => {
+      const model = new TestModel();
+      model["markFieldChanged"]("name");
+      model["markFieldChanged"]("score");
+
+      const changed = model["getChangedFields"]();
+      expect(changed).toContain("name");
+      expect(changed).toContain("score");
+    });
+
+    it("should clear changed fields after save", async () => {
+      const testId = id();
       mockedSearch.searchRequest.mockResolvedValue({
         _id: testId,
-        _version: 1
-      })
-      
-      const model = new TestModel({ id: testId, name: 'Test' })
-      model['markFieldChanged']('name')
-      
-      expect(model['getChangedFields']()).toContain('name')
-      
-      await model.save()
-      
-      expect(model['getChangedFields']()).toHaveLength(0)
-    })
-  })
+        _version: 1,
+      });
 
-  describe('original value tracking', () => {
+      const model = new TestModel({ id: testId, name: "Test" });
+      model["markFieldChanged"]("name");
+
+      expect(model["getChangedFields"]()).toContain("name");
+
+      await model.save();
+
+      expect(model["getChangedFields"]()).toHaveLength(0);
+    });
+  });
+
+  describe("original value tracking", () => {
     // The appointment change log reads getOriginalValues() in afterSave to
     // build from/to diffs, so the original must be the value before the
     // FIRST change and survive later changes to the same field.
-    it('records the original value and keeps it across multiple changes', () => {
-      const model = new TestModel({ id: id(), name: 'a', version: 1 })
-      model['clearChangedFields']()
+    it("records the original value and keeps it across multiple changes", () => {
+      const model = new TestModel({ id: id(), name: "a", version: 1 });
+      model["clearChangedFields"]();
 
-      model.name = 'b'
-      model.name = 'c'
+      model.name = "b";
+      model.name = "c";
 
-      expect(model.getOriginalValues()).toEqual({ name: 'a' })
-    })
+      expect(model.getOriginalValues()).toEqual({ name: "a" });
+    });
 
     // Reverting a field must clear its dirty state so no bogus change-log
     // entry is written when a save ends up not changing anything.
-    it('drops a field from changes when reverted to its original value', () => {
-      const model = new TestModel({ id: id(), name: 'a', score: 1, version: 1 })
-      model['clearChangedFields']()
+    it("drops a field from changes when reverted to its original value", () => {
+      const model = new TestModel({
+        id: id(),
+        name: "a",
+        score: 1,
+        version: 1,
+      });
+      model["clearChangedFields"]();
 
-      model.name = 'b'
-      model.score = 2
-      model.name = 'a' // revert
+      model.name = "b";
+      model.score = 2;
+      model.name = "a"; // revert
 
-      expect(model['getChangedFields']()).toEqual(['score'])
-      expect(model.getOriginalValues()).toEqual({ score: 1 })
-    })
+      expect(model["getChangedFields"]()).toEqual(["score"]);
+      expect(model.getOriginalValues()).toEqual({ score: 1 });
+    });
 
     // Ryan required getOriginalValues() to return a copy so callers cannot
     // corrupt the model's own change tracking.
-    it('returns a copy that cannot mutate internal tracking', () => {
-      const model = new TestModel({ id: id(), name: 'a', version: 1 })
-      model['clearChangedFields']()
-      model.name = 'b'
+    it("returns a copy that cannot mutate internal tracking", () => {
+      const model = new TestModel({ id: id(), name: "a", version: 1 });
+      model["clearChangedFields"]();
+      model.name = "b";
 
-      const snapshot = model.getOriginalValues()
-      snapshot.name = 'tampered'
-      ;(snapshot as Record<string, unknown>).extra = true
+      const snapshot = model.getOriginalValues();
+      snapshot.name = "tampered";
+      (snapshot as Record<string, unknown>).extra = true;
 
-      expect(model.getOriginalValues()).toEqual({ name: 'a' })
-    })
+      expect(model.getOriginalValues()).toEqual({ name: "a" });
+    });
 
     // Provider add/remove is an in-place array mutation; the change log needs
     // the array as it was before the first mutation.
-    it('records the pre-mutation array on in-place mutation', () => {
-      const model = new OriginalValuesModel({ id: id(), tags: ['a', 'b'], version: 1 })
-      model['clearChangedFields']()
+    it("records the pre-mutation array on in-place mutation", () => {
+      const model = new OriginalValuesModel({
+        id: id(),
+        tags: ["a", "b"],
+        version: 1,
+      });
+      model["clearChangedFields"]();
 
-      model.tags!.push('c')
+      model.tags!.push("c");
 
-      expect(model.getOriginalValues()).toEqual({ tags: ['a', 'b'] })
-    })
+      expect(model.getOriginalValues()).toEqual({ tags: ["a", "b"] });
+    });
 
     // The hook contract: original values are visible inside afterSave and
     // cleared once save completes. version is auto-managed bookkeeping and is
     // never tracked, so it must not leak into the change log.
-    it('exposes original values in afterSave, excludes version, and clears after save', async () => {
-      const testId = id()
-      mockedSearch.searchRequest.mockResolvedValue({ _id: testId, _version: 2 })
+    it("exposes original values in afterSave, excludes version, and clears after save", async () => {
+      const testId = id();
+      mockedSearch.searchRequest.mockResolvedValue({
+        _id: testId,
+        _version: 2,
+      });
 
-      const model = new OriginalValuesModel({ id: testId, name: 'old', version: 1 })
-      model['clearChangedFields']()
-      model.name = 'new'
+      const model = new OriginalValuesModel({
+        id: testId,
+        name: "old",
+        version: 1,
+      });
+      model["clearChangedFields"]();
+      model.name = "new";
 
-      await model.save()
+      await model.save();
 
-      expect(model.seenOriginalValues).toEqual({ name: 'old' })
-      expect(model['getChangedFields']()).toHaveLength(0)
-    })
-  })
+      expect(model.seenOriginalValues).toEqual({ name: "old" });
+      expect(model["getChangedFields"]()).toHaveLength(0);
+    });
+  });
 
-  describe('toJSON', () => {
-    it('should convert model to plain object', () => {
-      const testId = id()
+  describe("toJSON", () => {
+    it("should convert model to plain object", () => {
+      const testId = id();
       const model = new TestModel({
         id: testId,
-        name: 'Test',
+        name: "Test",
         score: 100,
-        isActive: true
-      })
+        isActive: true,
+      });
 
-      const json = model.toJSON()
+      const json = model.toJSON();
 
-      expect(json).toEqual(expect.objectContaining({
-        id: testId,
-        name: 'Test',
-        score: 100,
-        isActive: true
-      }))
-    })
+      expect(json).toEqual(
+        expect.objectContaining({
+          id: testId,
+          name: "Test",
+          score: 100,
+          isActive: true,
+        }),
+      );
+    });
 
-    it('should redact vector fields', () => {
+    it("should redact vector fields", () => {
       const model = new VectorSerializationModel({
-        name: 'Vector Test',
+        name: "Vector Test",
         embedding: [0.1, 0.2, 0.3],
-      })
+      });
 
-      const json = model.toJSON()
+      const json = model.toJSON();
 
-      expect(json).toEqual(expect.objectContaining({
-        name: 'Vector Test',
-        embedding: '[vector: 3 dimensions]',
-      }))
-    })
-  })
+      expect(json).toEqual(
+        expect.objectContaining({
+          name: "Vector Test",
+          embedding: "[vector: 3 dimensions]",
+        }),
+      );
+    });
+  });
 
-  describe('toPlain', () => {
-    it('should return a plain object with the current field values', () => {
-      const testId = id()
-      const birthDate = new Date('2000-01-01T00:00:00.000Z')
+  describe("toPlain", () => {
+    it("should return a plain object with the current field values", () => {
+      const testId = id();
+      const birthDate = new Date("2000-01-01T00:00:00.000Z");
       const model = new TestModel({
         id: testId,
-        name: 'Test',
+        name: "Test",
         score: 100,
         birthDate,
-        isActive: true
-      })
+        isActive: true,
+      });
 
-      const plain = model.toPlain()
+      const plain = model.toPlain();
 
-      expect(Object.getPrototypeOf(plain)).toBe(Object.prototype)
-      expect(plain).toEqual(expect.objectContaining({
-        id: testId,
-        name: 'Test',
-        score: 100,
-        birthDate,
-        isActive: true
-      }))
+      expect(Object.getPrototypeOf(plain)).toBe(Object.prototype);
+      expect(plain).toEqual(
+        expect.objectContaining({
+          id: testId,
+          name: "Test",
+          score: 100,
+          birthDate,
+          isActive: true,
+        }),
+      );
       // Dates survive as Date instances for the consumers (e.g. GraphQL scalars)
-      expect(plain.birthDate).toBeInstanceOf(Date)
-    })
+      expect(plain.birthDate).toBeInstanceOf(Date);
+    });
 
-    it('should not include undefined fields', () => {
-      const model = new TestModel({ id: id(), name: 'Test' })
-      const plain = model.toPlain()
-      expect(plain).not.toHaveProperty('score')
-      expect(plain).not.toHaveProperty('isActive')
-    })
-  })
+    it("should not include undefined fields", () => {
+      const model = new TestModel({ id: id(), name: "Test" });
+      const plain = model.toPlain();
+      expect(plain).not.toHaveProperty("score");
+      expect(plain).not.toHaveProperty("isActive");
+    });
+  });
 
-  describe('toSearch', () => {
-    it('should generate Elasticsearch document', () => {
-      const testId = id()
+  describe("toSearch", () => {
+    it("should generate Elasticsearch document", () => {
+      const testId = id();
       const model = new TestModel({
         id: testId,
-        name: 'Test',
-        score: 100
-      })
-      
-      const doc = model.toSearch()
-      
-      expect(doc).toHaveProperty('id', testId)
-      expect(doc).toHaveProperty('name', 'Test')
-      expect(doc).toHaveProperty('score', 100)
-    })
-  })
+        name: "Test",
+        score: 100,
+      });
 
-  describe('toString', () => {
-    it('should return JSON string representation', () => {
-      const model = new TestModel({ name: 'Test' })
-      const str = model.toString()
+      const doc = model.toSearch();
 
-      expect(typeof str).toBe('string')
-      const parsed = JSON.parse(str)
-      expect(parsed).toHaveProperty('name', 'Test')
-    })
+      expect(doc).toHaveProperty("id", testId);
+      expect(doc).toHaveProperty("name", "Test");
+      expect(doc).toHaveProperty("score", 100);
+    });
+  });
 
-    it('should redact vector fields in string output', () => {
+  describe("toString", () => {
+    it("should return JSON string representation", () => {
+      const model = new TestModel({ name: "Test" });
+      const str = model.toString();
+
+      expect(typeof str).toBe("string");
+      const parsed = JSON.parse(str);
+      expect(parsed).toHaveProperty("name", "Test");
+    });
+
+    it("should redact vector fields in string output", () => {
       const model = new VectorSerializationModel({
-        name: 'Vector Test',
+        name: "Vector Test",
         embedding: [0.1, 0.2, 0.3],
-      })
-      const str = model.toString()
+      });
+      const str = model.toString();
 
-      expect(str).toContain('"embedding":"[vector: 3 dimensions]"')
-      expect(str).not.toContain('[0.1,0.2,0.3]')
-    })
-  })
-})
+      expect(str).toContain('"embedding":"[vector: 3 dimensions]"');
+      expect(str).not.toContain("[0.1,0.2,0.3]");
+    });
+  });
+});

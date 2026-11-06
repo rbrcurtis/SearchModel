@@ -1,5 +1,5 @@
-import 'reflect-metadata';
-import { FieldMetadata } from '../decorators';
+import "reflect-metadata";
+import { FieldMetadata } from "../decorators";
 export interface SearchOptions {
     limit?: number;
     sort?: string | Record<string, unknown>[];
@@ -51,6 +51,12 @@ export declare abstract class SearchModel<T extends SearchModel<T>> {
     }): Record<string, any>;
     static getElasticsearchFieldType(field: FieldMetadata): any;
     static buildObjectMapping(properties: Record<string, any>): Record<string, any>;
+    static getMapping<T extends SearchModel<T>>(this: new (data?: Partial<T>) => T & {
+        constructor: typeof SearchModel;
+    }): Promise<Record<string, any>>;
+    static updateFieldMapping<T extends SearchModel<T>>(this: new (data?: Partial<T>) => T & {
+        constructor: typeof SearchModel;
+    }, fieldName: string): Promise<boolean>;
     static createIndex<T extends SearchModel<T>>(this: new (data?: Partial<T>) => T & {
         constructor: typeof SearchModel;
     }): Promise<void>;
